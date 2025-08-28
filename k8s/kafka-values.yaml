@@ -29,3 +29,19 @@ service:
 # 인증 비활성화
 auth:
   enabled: false
+
+# 토픽 자동 생성 설정
+controller:
+  extraEnvVars:
+    - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+      value: "true"
+    - name: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+      value: ""
+    - name: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+      value: ""
+    - name: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+      value: "PLAIN"
+    - name: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+      value: "PLAIN"
+    - name: KAFKA_CFG_SASL_JAAS_CONFIG
+      value: "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"admin\" password=\"admin-secret\";"
