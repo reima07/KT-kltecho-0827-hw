@@ -47,14 +47,33 @@
 
         <div class="section">
           <h2>Redis 로그</h2>
-          <button @click="getRedisLogs">로그 조회</button>
+          <button @click="getRedisLogs">Redis 로그 조회 (최근 10개)</button>
           <div v-if="redisLogs.length">
-            <h3>API 호출 로그:</h3>
+            <h3>API 호출 로그 (최근 10개):</h3>
             <ul>
-              <li v-for="(log, index) in redisLogs" :key="index">
+              <li v-for="(log, index) in redisLogs.slice(0, 10)" :key="index">
                 [{{ formatDate(log.timestamp) }}] {{ log.action }}: {{ log.details }}
               </li>
             </ul>
+            <p v-if="redisLogs.length > 10" class="log-note">
+              * 최근 10개 로그만 표시됩니다. (총 {{ redisLogs.length }}개)
+            </p>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Kafka 로그</h2>
+          <button @click="getKafkaLogs">Kafka 로그 조회 (최근 10개)</button>
+          <div v-if="kafkaLogs.length">
+            <h3>API 통계 로그 (최근 10개):</h3>
+            <ul>
+              <li v-for="(log, index) in kafkaLogs.slice(0, 10)" :key="index">
+                [{{ formatDate(log.timestamp) }}] {{ log.action }}: {{ log.details }}
+              </li>
+            </ul>
+            <p v-if="kafkaLogs.length > 10" class="log-note">
+              * 최근 10개 로그만 표시됩니다. (총 {{ kafkaLogs.length }}개)
+            </p>
           </div>
         </div>
 
@@ -109,6 +128,7 @@ export default {
       dbMessage: '',
       dbData: [],
       redisLogs: [],
+      kafkaLogs: [],
       sampleMessages: [
         '안녕하세요! 테스트 메시지입니다.',
         'K8s 데모 샘플 데이터입니다.',
@@ -142,7 +162,6 @@ export default {
         });
         this.dbMessage = '';
         this.getFromDb();
-        this.getRedisLogs();
       } catch (error) {
         console.error('DB 저장 실패:', error);
       }
@@ -170,7 +189,6 @@ export default {
           message: randomMessage
         });
         this.getFromDb();
-        this.getRedisLogs();
       } catch (error) {
         console.error('샘플 데이터 저장 실패:', error);
       }
@@ -183,6 +201,16 @@ export default {
         this.redisLogs = response.data;
       } catch (error) {
         console.error('Redis 로그 조회 실패:', error);
+      }
+    },
+
+    // Kafka에 저장된 API 통계 로그 조회
+    async getKafkaLogs() {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/logs/kafka`);
+        this.kafkaLogs = response.data;
+      } catch (error) {
+        console.error('Kafka 로그 조회 실패:', error);
       }
     },
 
@@ -426,5 +454,13 @@ li {
 
 .view-all-btn:hover {
   background-color: #5a6268;
+}
+
+.log-note {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin-top: 10px;
+  text-align: center;
 }
 </style> 

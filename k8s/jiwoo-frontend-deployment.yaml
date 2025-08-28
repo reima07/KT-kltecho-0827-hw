@@ -28,10 +28,9 @@ metadata:
   name: jiwoo-frontend-service
   # namespace는 배포 시 -n jiwoo 옵션으로 지정
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: jiwoo-frontend
   ports:
   - port: 80
     targetPort: 80
-    nodePort: 30080
