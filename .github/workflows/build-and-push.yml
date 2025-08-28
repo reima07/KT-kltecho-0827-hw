@@ -47,9 +47,9 @@ jobs:
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend \
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:${{ steps.datetime.outputs.datetime }} \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:latest .
-          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:${{ steps.datetime.outputs.datetime }}
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:latest
 
   # 프론트엔드 애플리케이션 빌드 및 푸시 작업
@@ -87,7 +87,7 @@ jobs:
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |
-          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend \
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:${{ steps.datetime.outputs.datetime }} \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest .
-          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:${{ steps.datetime.outputs.datetime }}
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest

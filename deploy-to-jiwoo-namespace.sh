@@ -8,7 +8,7 @@ echo "=================================="
 
 # 1단계: jiwoo 네임스페이스 생성
 echo "📁 1단계: jiwoo 네임스페이스 생성"
-kubectl create namespace jiwoo --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace jiwoo --dry-run=client -o yaml | kubectl apply -f - -v=1
 echo "✅ 네임스페이스 생성 완료"
 
 # 2단계: Helm 저장소 추가
@@ -25,7 +25,8 @@ helm install jiwoo-redis bitnami/redis \
   --values k8s/redis-values.yaml \
   --namespace jiwoo \
   --wait \
-  --timeout 300s
+  --timeout 300s \
+  --debug
 echo "   ✅ Redis 설치 완료"
 
 echo "   - Kafka 설치 중..."
@@ -33,7 +34,8 @@ helm install jiwoo-kafka bitnami/kafka \
   --values k8s/kafka-values.yaml \
   --namespace jiwoo \
   --wait \
-  --timeout 300s
+  --timeout 300s \
+  --debug
 echo "   ✅ Kafka 설치 완료"
 
 echo "   - MariaDB 설치 중..."
@@ -41,19 +43,20 @@ helm install jiwoo-mariadb bitnami/mariadb \
   --values k8s/mariadb-values.yaml \
   --namespace jiwoo \
   --wait \
-  --timeout 300s
+  --timeout 300s \
+  --debug
 echo "   ✅ MariaDB 설치 완료"
 
 # 4단계: 초기화 Job 실행
 echo "🔧 4단계: 초기화 Job 실행"
 
 echo "   - MariaDB 초기화 Job 실행 중..."
-kubectl apply -f k8s/jiwoo-mariadb-init-job.yaml -n jiwoo
+kubectl apply -f k8s/jiwoo-mariadb-init-job.yaml -n jiwoo -v=1
 kubectl wait --for=condition=complete job/jiwoo-mariadb-init --timeout=120s -n jiwoo
 echo "   ✅ MariaDB 초기화 완료"
 
 echo "   - Redis 초기화 Job 실행 중..."
-kubectl apply -f k8s/jiwoo-redis-init-job.yaml -n jiwoo
+kubectl apply -f k8s/jiwoo-redis-init-job.yaml -n jiwoo -v=1
 kubectl wait --for=condition=complete job/jiwoo-redis-init --timeout=120s -n jiwoo
 echo "   ✅ Redis 초기화 완료"
 
@@ -61,16 +64,17 @@ echo "   ✅ Redis 초기화 완료"
 echo "🚀 5단계: 애플리케이션 배포"
 
 echo "   - Secret 적용 중..."
-kubectl apply -f k8s/jiwoo-backend-secret.yaml -n jiwoo
+kubectl apply -f k8s/jiwoo-backend-secret.yaml -n jiwoo -v=1
+kubectl apply -f k8s/jiwoo-acr-secret.yaml -n jiwoo -v=1
 echo "   ✅ Secret 적용 완료"
 
 echo "   - 백엔드 배포 중..."
-kubectl apply -f k8s/jiwoo-backend-deployment.yaml -n jiwoo
+kubectl apply -f k8s/jiwoo-backend-deployment.yaml -n jiwoo -v=1
 kubectl rollout status deployment/jiwoo-backend --timeout=300s -n jiwoo
 echo "   ✅ 백엔드 배포 완료"
 
 echo "   - 프론트엔드 배포 중..."
-kubectl apply -f k8s/jiwoo-frontend-deployment.yaml -n jiwoo
+kubectl apply -f k8s/jiwoo-frontend-deployment.yaml -n jiwoo -v=1
 kubectl rollout status deployment/jiwoo-frontend --timeout=300s -n jiwoo
 echo "   ✅ 프론트엔드 배포 완료"
 

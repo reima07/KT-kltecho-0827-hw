@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: jiwoo-redis-init
-  namespace: default
+  # namespace는 배포 시 -n jiwoo 옵션으로 지정
 spec:
   template:
     spec:

@@ -86,10 +86,32 @@ CI/CD: GitHub Actions (예정)
 - [x] **Azure Container Registry 연동** 준비
 - [x] **GitHub 저장소 연결** 완료
 
+#### 5. 리소스 최적화 및 문제 해결
+- [x] **MariaDB CPU 최적화** (500m → 250m, 50% 감소)
+- [x] **Redis/Kafka 리소스 설정** (적절한 CPU/Memory 요구량)
+- [x] **배포 스케줄링 문제 해결** (Insufficient cpu 오류 해결)
+- [x] **타임아웃 및 로깅 개선** (Helm debug, kubectl verbose)
+- [x] **네임스페이스 불일치 해결** (YAML 파일 namespace 주석 처리)
+- [x] **이미지 태그 불일치 해결** (구체적인 날짜시간 태그 사용)
+
+#### 6. 문서화
+- [x] **docs/ 폴더 생성** (체계적인 문서 관리)
+- [x] **리소스 최적화 가이드** (kubernetes-resources.md)
+- [x] **배포 문제 해결 가이드** (deployment-issues.md)
+- [x] **GitHub Actions 설정 가이드** (github-actions-setup.md)
+
+### 🔄 진행 중인 작업
+
+#### 1. ACR 인증 문제 해결
+- [ ] **Kubernetes ACR 인증 설정** (imagePullSecrets)
+- [ ] **401 Unauthorized 오류 해결** (ACR 시크릿 생성)
+- [ ] **이미지 풀링 테스트** (배포 검증)
+- [x] **CI/CD 파이프라인 가이드** (CI_CD_PIPELINE.md)
+
 ### 🔄 진행 중인 작업
 - [ ] **GitHub Actions Secrets 설정** (ACR 정보 3개)
 - [ ] **Azure Container Registry 생성**
-- [ ] **배포 테스트**
+- [ ] **최적화된 설정으로 배포 테스트**
 
 ### 📋 예정된 작업
 
@@ -149,6 +171,10 @@ CI/CD: GitHub Actions (예정)
 │   └── *-values.yaml           # Helm 차트 설정
 ├── .github/workflows/        # GitHub Actions 워크플로우
 │   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시
+├── docs/                    # 문서화
+│   ├── RESOURCE_OPTIMIZATION.md    # 리소스 최적화 가이드
+│   ├── DEPLOYMENT_TROUBLESHOOTING.md # 배포 문제 해결 가이드
+│   └── CI_CD_PIPELINE.md           # CI/CD 파이프라인 가이드
 ├── deploy-to-jiwoo-namespace.sh    # 배포 스크립트
 ├── cleanup-jiwoo-namespace.sh      # 정리 스크립트
 ├── CHANGELOG.md             # 변경사항 기록
@@ -159,9 +185,9 @@ CI/CD: GitHub Actions (예정)
 ## 🔧 주요 설정
 
 ### Helm Charts (Bitnami)
-- **Redis**: 비밀번호 `New1234!`, standalone 모드
-- **Kafka**: 3개 컨트롤러, SASL 인증 비활성화
-- **MariaDB**: 사용자 `jiwoo`, 비밀번호 `jiwoo1234!`, DB `jiwoo_db`
+- **Redis**: 비밀번호 `New1234!`, standalone 모드, CPU 100m, Memory 128Mi
+- **Kafka**: 3개 컨트롤러, SASL 인증 비활성화, CPU 200m, Memory 256Mi
+- **MariaDB**: 사용자 `jiwoo`, 비밀번호 `jiwoo1234!`, DB `jiwoo_db`, CPU 250m, Memory 512Mi
 
 ### Docker 이미지
 - **Backend**: `{ACR_LOGIN_SERVER}/kltecho_jiwoo_날짜시간-backend`

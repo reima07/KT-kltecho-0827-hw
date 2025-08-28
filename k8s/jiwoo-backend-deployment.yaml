@@ -13,6 +13,8 @@ spec:
       labels:
         app: jiwoo-backend
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
       - name: backend
         image: ktech4.azurecr.io/kltecho_jiwoo-backend:latest

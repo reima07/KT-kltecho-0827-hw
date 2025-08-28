@@ -7,6 +7,39 @@
 
 ## 🚀 주요 변경사항 (원본 대비)
 
+### 2024-08-28 - CI/CD 파이프라인 및 ACR 인증 설정
+
+#### GitHub Actions CI/CD 워크플로우 설정
+- **파일**: `.github/workflows/build-and-push.yml`
+- **기능**: Docker 이미지 빌드 및 Azure Container Registry(ACR) 푸시
+- **트리거**: main, master, develop 브랜치 푸시 시
+- **이미지 태그**: 한국 시간(KST) 기준 `YYYYMMDD_HHMMSS` 형식 + `latest`
+- **필요한 Secrets**: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`
+
+#### ACR 인증 설정
+- **파일**: `k8s/jiwoo-acr-secret.yaml`
+- **기능**: Kubernetes에서 ACR 이미지 풀링을 위한 인증
+- **타입**: `kubernetes.io/dockerconfigjson`
+- **배포 파일 수정**: `imagePullSecrets` 추가
+
+#### 이미지 이름 통일
+- **GitHub Actions**: `kltecho_jiwoo-backend:latest`, `kltecho_jiwoo-frontend:latest`
+- **배포 파일**: `kltecho_jiwoo-backend:latest`, `kltecho_jiwoo-frontend:latest`
+- **이전 문제**: 하이픈(-) vs 언더스코어(_) 불일치 해결
+
+#### 배포 스크립트 업데이트
+- **파일**: `deploy-to-jiwoo-namespace.sh`
+- **추가**: ACR 시크릿 적용 단계
+- **순서**: Secret → ACR Secret → Backend → Frontend
+
+#### 리소스 최적화 (이전)
+- **MariaDB**: CPU 500m → 250m, Memory 1Gi → 512Mi
+- **Redis**: CPU 200m → 100m, Memory 256Mi → 128Mi  
+- **Kafka**: Controller CPU 400m → 200m, Memory 512Mi → 256Mi
+- **Zookeeper**: CPU 200m → 100m, Memory 256Mi → 128Mi
+
+### 2024-08-27 - 초기 설정 및 리소스 최적화
+
 ### 1. Helm Charts 설정 (Bitnami)
 
 #### Redis 설정 (`k8s/redis-values.yaml`)
@@ -385,13 +418,73 @@ spec:
   ```
 
 #### GitHub Secrets 설정 가이드 생성
-- **파일**: `GITHUB_SECRETS_SETUP.md`
+- **파일**: `GITHUB_SECRETS_SETUP.md` (삭제됨)
   - ACR 인증 정보 설정 방법
   - Azure 서비스 주체 생성 가이드
   - AKS 클러스터 연결 방법
   - 보안 주의사항 및 체크리스트
 
-### 9. 워크플로우 기능 상세
+### 9. 리소스 최적화 및 문제 해결
+
+#### MariaDB CPU 최적화
+- **문제**: CPU 500m 요구로 인한 `Insufficient cpu` 오류
+- **해결**: CPU 요구량을 250m로 50% 감소
+- **파일**: `k8s/mariadb-values.yaml`
+```yaml
+primary:
+  resources:
+    requests:
+      cpu: 250m        # 500m에서 50% 감소
+      memory: 512Mi    # 적절한 메모리 설정
+```
+
+#### Redis/Kafka 리소스 설정
+- **Redis**: CPU 100m, Memory 128Mi 설정
+- **Kafka**: CPU 200m, Memory 256Mi 설정 (기존 유지)
+- **파일**: `k8s/redis-values.yaml`, `k8s/kafka-values.yaml`
+
+#### 배포 스크립트 개선
+- **Helm debug 로깅**: `--debug` 플래그 추가
+- **kubectl verbose**: `-v=1` 플래그 추가
+- **타임아웃 조정**: 600s → 300s (사용자 요청)
+- **파일**: `deploy-to-jiwoo-namespace.sh`
+
+#### 네임스페이스 불일치 해결
+- **문제**: YAML 파일의 `namespace: default`와 스크립트의 `-n jiwoo` 불일치
+- **해결**: 모든 YAML 파일에서 namespace 필드 주석 처리
+- **파일**: `k8s/jiwoo-*.yaml` 모든 파일
+
+#### 이미지 태그 불일치 해결
+- **문제**: GitHub Actions는 날짜시간 태그, YAML은 latest 태그 사용
+- **해결**: 구체적인 날짜시간 태그 사용 (예: `kltecho_jiwoo_20250828_032716-backend`)
+- **파일**: `k8s/jiwoo-backend-deployment.yaml`, `k8s/jiwoo-frontend-deployment.yaml`
+
+### 10. 문서화 개선
+
+#### docs/ 폴더 생성
+- **체계적인 문서 관리**: 프로젝트별 가이드 분리
+- **상세한 문제 해결 가이드**: 실제 발생한 문제들과 해결 방법
+
+#### 리소스 최적화 가이드 (`docs/RESOURCE_OPTIMIZATION.md`)
+- 클러스터 리소스 현황 분석
+- MariaDB/Redis/Kafka 적절한 리소스 설정
+- 모니터링 명령어 모음
+- 개발/프로덕션 환경 권장사항
+
+#### 배포 문제 해결 가이드 (`docs/DEPLOYMENT_TROUBLESHOOTING.md`)
+- 발생한 문제들과 해결 방법 상세 기록
+- 배포 스크립트 개선사항
+- 예방 방법과 체크리스트
+- 디버깅 명령어 모음
+
+#### CI/CD 파이프라인 가이드 (`docs/CI_CD_PIPELINE.md`)
+- GitHub Actions 워크플로우 상세 설명
+- GitHub Secrets 설정 방법
+- Docker 이미지 태깅 전략
+- Azure Container Registry 설정
+- 문제 해결 및 모니터링 방법
+
+### 11. 워크플로우 기능 상세
 
 #### 빌드 및 푸시 워크플로우 (`build-and-push.yml`)
 ```yaml
@@ -412,7 +505,7 @@ spec:
 - 배포 상태 실시간 모니터링
 ```
 
-### 10. 필요한 GitHub Secrets
+### 12. 필요한 GitHub Secrets
 
 #### Azure Container Registry (3개만)
 - `ACR_LOGIN_SERVER`: ACR 서버 주소 (예: ktech4.azurecr.io)
@@ -424,7 +517,7 @@ spec:
 - ~~AZURE_RESOURCE_GROUP~~ - ACR만 사용하므로 불필요
 - ~~AKS_CLUSTER_NAME~~ - 직접 배포하므로 불필요
 
-### 11. 배포 프로세스
+### 13. 배포 프로세스
 
 #### 1단계: 코드 푸시
 ```bash
@@ -443,7 +536,7 @@ git push origin main
 - 애플리케이션 배포
 - 배포 상태 확인
 
-### 12. 최종 배포 구조
+### 14. 최종 배포 구조
 
 #### 하이브리드 배포 방식
 - **빌드**: GitHub Actions 자동화 (Docker 이미지 빌드 + ACR 푸시)
@@ -505,6 +598,10 @@ git push origin main
 │   └── *-values.yaml           # Helm 차트 설정
 ├── .github/workflows/        # GitHub Actions 워크플로우
 │   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시 (한국 시간 태깅)
+├── docs/                    # 문서화
+│   ├── RESOURCE_OPTIMIZATION.md    # 리소스 최적화 가이드
+│   ├── DEPLOYMENT_TROUBLESHOOTING.md # 배포 문제 해결 가이드
+│   └── CI_CD_PIPELINE.md           # CI/CD 파이프라인 가이드
 ├── deploy-to-jiwoo-namespace.sh    # 배포 스크립트
 ├── cleanup-jiwoo-namespace.sh      # 정리 스크립트
 ├── env.example               # 환경변수 템플릿 (참고용)
