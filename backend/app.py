@@ -5,6 +5,7 @@ import mysql.connector
 import json
 from datetime import datetime
 import os
+import time
 from kafka import KafkaProducer, KafkaConsumer
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -225,6 +226,9 @@ def login():
                 print(f"Redis session error: {str(redis_error)}")
                 # Redis 오류는 무시하고 계속 진행
             
+            # Kafka 로깅 추가
+            async_log_api_stats('/login', 'POST', 'success', username)
+            
             return jsonify({
                 "status": "success", 
                 "message": "로그인 성공",
@@ -246,8 +250,12 @@ def logout():
             redis_client = get_redis_connection()
             redis_client.delete(f"session:{username}")
             session.pop('user_id', None)
+            # Kafka 로깅 추가
+            async_log_api_stats('/logout', 'POST', 'success', username)
         return jsonify({"status": "success", "message": "로그아웃 성공"})
     except Exception as e:
+        if 'user_id' in session:
+            async_log_api_stats('/logout', 'POST', 'error', session['user_id'])
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # 메시지 검색 (DB에서 검색)
@@ -285,26 +293,40 @@ def get_kafka_logs():
             'api-logs',
             bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            group_id='api-logs-viewer',
+            group_id='api-logs-viewer-' + str(int(time.time())),  # 고유한 그룹 ID
             auto_offset_reset='earliest',
-            consumer_timeout_ms=5000
+            consumer_timeout_ms=3000,  # 3초로 증가
+            enable_auto_commit=True,
+            auto_commit_interval_ms=1000
         )
         
         logs = []
         try:
-            for message in consumer:
-                logs.append({
-                    'timestamp': message.value['timestamp'],
-                    'action': f"{message.value['method']} {message.value['endpoint']}",
-                    'details': message.value['message']
-                })
+            # 메시지를 한 번에 가져오기
+            messages = list(consumer)
+            print(f"Raw messages from Kafka: {len(messages)}")
+            
+            for message in messages:
+                try:
+                    logs.append({
+                        'timestamp': message.value['timestamp'],
+                        'action': f"{message.value['method']} {message.value['endpoint']}",
+                        'details': message.value['message']
+                    })
+                except Exception as msg_error:
+                    print(f"Message processing error: {str(msg_error)}")
+                    continue
+                    
                 if len(logs) >= 100:
                     break
+        except Exception as consumer_error:
+            print(f"Consumer error: {str(consumer_error)}")
         finally:
             consumer.close()
         
         # 시간 역순으로 정렬
         logs.sort(key=lambda x: x['timestamp'], reverse=True)
+        print(f"Kafka logs found: {len(logs)}")
         return jsonify(logs)
     except Exception as e:
         print(f"Kafka log retrieval error: {str(e)}")
