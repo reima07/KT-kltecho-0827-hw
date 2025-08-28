@@ -1,67 +1,53 @@
-# Python
+# 환경 변수 파일들
+*.env
+.env.local
+.env.production
+.env.staging
+
+# Azure 관련 파일들
+azure-credentials.json
+azure-config.json
+*.pem
+*.key
+*.crt
+
+# 로그 파일들
+*.log
+logs/
+
+# 임시 파일들
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE 설정 파일들
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node.js 관련
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python 관련
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.env
 venv/
-.venv/
-.python-version
+ENV/
+env.bak/
+venv.bak/
 
-# Vue.js / Node
-.DS_Store
-node_modules/
-/dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-/test/unit/coverage/
-/test/e2e/reports/
-selenium-debug.log
+# Docker 관련
+.dockerignore
 
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw*
-
-# Kubernetes
+# Kubernetes 관련
 *.kubeconfig
-kubeconfig*
-
-# Local development
-.env.local
-.env.*.local
-
-# Log files
-*.log
-logs/
-log/
-
-# Docker
-.docker/
-docker-compose.override.yml
-
-# System Files
-.DS_Store
-Thumbs.db 
+kubeconfig 

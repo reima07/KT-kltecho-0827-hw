@@ -1,0 +1,12 @@
+auth:
+  enabled: true
+  password: "New1234!"
+
+architecture: standalone
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  size: 1Gi

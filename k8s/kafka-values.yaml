@@ -1,0 +1,17 @@
+controller:
+  replicaCount: 3
+
+zookeeper:
+  enabled: true
+  replicaCount: 3
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+service:
+  type: ClusterIP
+
+# 인증 비활성화
+auth:
+  enabled: false

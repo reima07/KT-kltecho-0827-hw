@@ -18,12 +18,13 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')  # 세션
 # thread_pool = ThreadPoolExecutor(max_workers=5)
 
 # MariaDB 연결 함수
+# [변경사항] database를 환경변수로 변경하여 jiwoo_db 사용
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv('MYSQL_HOST', 'my-mariadb'),
         user=os.getenv('MYSQL_USER', 'testuser'),
         password=os.getenv('MYSQL_PASSWORD'),
-        database="testdb",
+        database=os.getenv('MYSQL_DATABASE', 'jiwoo_db'),  # [변경] testdb → jiwoo_db
         connect_timeout=30
     )
 
@@ -38,14 +39,12 @@ def get_redis_connection():
     )
 
 # Kafka Producer 설정
+# [변경사항] SASL 인증 제거하여 단순 연결로 변경
 def get_kafka_producer():
     return KafkaProducer(
         bootstrap_servers=os.getenv('KAFKA_SERVERS', 'my-kafka:9092'),
-        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        security_protocol='SASL_PLAINTEXT',
-        sasl_mechanism='PLAIN',
-        sasl_plain_username=os.getenv('KAFKA_USERNAME', 'user1'),
-        sasl_plain_password=os.getenv('KAFKA_PASSWORD', '')
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        # [변경] SASL 인증 설정 제거 (security_protocol, sasl_mechanism 등)
     )
 
 # 로깅 함수
@@ -105,8 +104,9 @@ def save_to_db():
         db = get_db_connection()
         data = request.json
         cursor = db.cursor()
-        sql = "INSERT INTO messages (message, created_at) VALUES (%s, %s)"
-        cursor.execute(sql, (data['message'], datetime.now()))
+        # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
+        sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
+        cursor.execute(sql, (data['message'], user_id, datetime.now()))
         db.commit()
         cursor.close()
         db.close()

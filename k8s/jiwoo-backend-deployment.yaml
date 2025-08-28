@@ -1,65 +1,67 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: jiwoo-backend
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend
+      app: jiwoo-backend
   template:
     metadata:
       labels:
-        app: backend
+        app: jiwoo-backend
     spec:
       containers:
       - name: backend
-        image: giglepeople/aks-test-app-backend:latest
-        # imagePullPolicy: Never
+        image: ktech4.azurecr.io/kltecho_jiwoo-backend:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
         - name: MYSQL_HOST
-          value: "my-mariadb"
+          value: "jiwoo-mariadb"
         - name: MYSQL_USER
-          value: "testuser"
+          value: "jiwoo"
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: backend-secrets
+              name: jiwoo-backend-secrets
               key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          value: "jiwoo_db"
         - name: REDIS_HOST
-          value: "my-redis-master"
+          value: "jiwoo-redis-master"
         - name: KAFKA_SERVERS
-          value: "my-kafka:9092"
+          value: "jiwoo-kafka:9092"
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: backend-secrets
+              name: jiwoo-backend-secrets
               key: REDIS_PASSWORD
         - name: KAFKA_USERNAME
           value: "user1"
         - name: KAFKA_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: backend-secrets
+              name: jiwoo-backend-secrets
               key: KAFKA_PASSWORD
         - name: FLASK_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: backend-secrets
+              name: jiwoo-backend-secrets
               key: FLASK_SECRET_KEY
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: backend-service
+  name: jiwoo-backend-service
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: backend
+    app: jiwoo-backend
   ports:
   - port: 5000
-    targetPort: 5000 
+    targetPort: 5000

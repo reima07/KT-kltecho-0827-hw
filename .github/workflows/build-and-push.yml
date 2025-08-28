@@ -1,0 +1,92 @@
+# GitHub Actions CI/CD 워크플로우
+# Docker 이미지를 빌드하고 Azure Container Registry(ACR)에 푸시하는 자동화 파이프라인
+# 배포는 수동으로 kubectl 명령어를 통해 jiwoo 네임스페이스에서 실행
+name: Build and Push Docker Images
+
+# 워크플로우 트리거 조건
+# main, master, develop 브랜치에 코드가 푸시될 때 실행
+on:
+  push:
+    branches: [ main, master, develop ]
+
+# 실행할 작업들 정의
+jobs:
+  # 백엔드 애플리케이션 빌드 및 푸시 작업
+  build-backend:
+    runs-on: ubuntu-latest  # Ubuntu 최신 버전에서 실행
+    defaults:
+      run:
+        working-directory: ./backend  # 백엔드 디렉토리에서 작업 수행
+    steps:
+      # 1단계: GitHub 저장소 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2단계: Docker Buildx 설정 (멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3단계: Azure Container Registry 로그인
+      # GitHub Secrets에서 인증 정보를 가져와 ACR에 로그인
+      - name: Log in to Azure Container Registry (ACR)
+        uses: azure/docker-login@v1
+        with:
+          login-server: ktech4.azurecr.io  # ACR 서버 주소
+          username: ${{ secrets.ACR_USERNAME }}  # GitHub Secrets에서 사용자명 가져오기
+          password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
+
+      # 4단계: 현재 날짜와 시간 가져오기 (이미지 태그용)
+      # YYYYMMDD_HHMMSS 형식으로 날짜와 시간 생성하여 이미지 태그로 사용
+      - name: Get current date and time
+        id: datetime
+        run: echo "datetime=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+      # 5단계: Docker 이미지 빌드 및 ACR 푸시
+      # kltecho_jiwoo_날짜시간-backend라는 이름으로 이미지 빌드
+      # 날짜시간 태그와 latest 태그 두 가지로 푸시
+      - name: Build and push Docker image to ACR
+        run: |
+          docker build -t ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend \
+            -t ktech4.azurecr.io/kltecho_jiwoo-backend:latest .
+          docker push ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend
+          docker push ktech4.azurecr.io/kltecho_jiwoo-backend:latest
+
+  # 프론트엔드 애플리케이션 빌드 및 푸시 작업
+  build-frontend:
+    runs-on: ubuntu-latest  # Ubuntu 최신 버전에서 실행
+    defaults:
+      run:
+        working-directory: ./frontend  # 프론트엔드 디렉토리에서 작업 수행
+    steps:
+      # 1단계: GitHub 저장소 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2단계: Docker Buildx 설정 (멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3단계: Azure Container Registry 로그인
+      # GitHub Secrets에서 인증 정보를 가져와 ACR에 로그인
+      - name: Log in to Azure Container Registry (ACR)
+        uses: azure/docker-login@v1
+        with:
+          login-server: ktech4.azurecr.io  # ACR 서버 주소
+          username: ${{ secrets.ACR_USERNAME }}  # GitHub Secrets에서 사용자명 가져오기
+          password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
+
+      # 4단계: 현재 날짜와 시간 가져오기 (이미지 태그용)
+      # YYYYMMDD_HHMMSS 형식으로 날짜와 시간 생성하여 이미지 태그로 사용
+      - name: Get current date and time
+        id: datetime
+        run: echo "datetime=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+      # 5단계: Docker 이미지 빌드 및 ACR 푸시
+      # kltecho_jiwoo_날짜시간-frontend라는 이름으로 이미지 빌드
+      # 날짜시간 태그와 latest 태그 두 가지로 푸시
+      - name: Build and push Docker image to ACR
+        run: |
+          docker build -t ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend \
+            -t ktech4.azurecr.io/kltecho_jiwoo-frontend:latest .
+          docker push ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend
+          docker push ktech4.azurecr.io/kltecho_jiwoo-frontend:latest

@@ -1,0 +1,13 @@
+auth:
+  enabled: true
+  username: "jiwoo"
+  password: "jiwoo1234!"
+  database: "jiwoo_db"
+
+primary:
+  persistence:
+    enabled: true
+    size: 1Gi
+
+service:
+  type: ClusterIP

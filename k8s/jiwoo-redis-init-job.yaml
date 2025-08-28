@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: jiwoo-redis-init
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+      - name: redis-init
+        image: docker.io/bitnami/redis:8.2.1-debian-12-r0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for Redis to be ready..."
+          until redis-cli -h jiwoo-redis-master -a New1234! ping; do
+            sleep 5
+          done
+          
+          echo "Adding test data to Redis..."
+          redis-cli -h jiwoo-redis-master -a New1234! lpush api_logs '{"timestamp":"2025-08-28T00:30:00","action":"init","details":"Redis 초기화 완료"}'
+          redis-cli -h jiwoo-redis-master -a New1234! lpush api_logs '{"timestamp":"2025-08-28T00:30:01","action":"test","details":"Redis 연결 테스트 성공"}'
+          
+          echo "Redis initialization completed!"
+      restartPolicy: OnFailure
