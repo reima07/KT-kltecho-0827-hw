@@ -1,6 +1,7 @@
 # GitHub Actions CI/CD 워크플로우
 # Docker 이미지를 빌드하고 Azure Container Registry(ACR)에 푸시하는 자동화 파이프라인
 # 배포는 수동으로 kubectl 명령어를 통해 jiwoo 네임스페이스에서 실행
+# 필요한 Secrets: ACR_LOGIN_SERVER, ACR_USERNAME, ACR_PASSWORD
 name: Build and Push Docker Images
 
 # 워크플로우 트리거 조건
@@ -31,7 +32,7 @@ jobs:
       - name: Log in to Azure Container Registry (ACR)
         uses: azure/docker-login@v1
         with:
-          login-server: ktech4.azurecr.io  # ACR 서버 주소
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}  # ACR 서버 주소
           username: ${{ secrets.ACR_USERNAME }}  # GitHub Secrets에서 사용자명 가져오기
           password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
 
@@ -46,10 +47,10 @@ jobs:
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |
-          docker build -t ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend \
-            -t ktech4.azurecr.io/kltecho_jiwoo-backend:latest .
-          docker push ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend
-          docker push ktech4.azurecr.io/kltecho_jiwoo-backend:latest
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:latest .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-backend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-backend:latest
 
   # 프론트엔드 애플리케이션 빌드 및 푸시 작업
   build-frontend:
@@ -71,7 +72,7 @@ jobs:
       - name: Log in to Azure Container Registry (ACR)
         uses: azure/docker-login@v1
         with:
-          login-server: ktech4.azurecr.io  # ACR 서버 주소
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}  # ACR 서버 주소
           username: ${{ secrets.ACR_USERNAME }}  # GitHub Secrets에서 사용자명 가져오기
           password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
 
@@ -86,7 +87,7 @@ jobs:
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |
-          docker build -t ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend \
-            -t ktech4.azurecr.io/kltecho_jiwoo-frontend:latest .
-          docker push ktech4.azurecr.io/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend
-          docker push ktech4.azurecr.io/kltecho_jiwoo-frontend:latest
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo_${{ steps.datetime.outputs.datetime }}-frontend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest
