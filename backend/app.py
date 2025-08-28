@@ -43,7 +43,10 @@ def get_redis_connection():
 def get_kafka_producer():
     return KafkaProducer(
         bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+        # 토픽 자동 생성 설정
+        acks='all',
+        retries=3
         # [변경] SASL 인증 설정 제거 (security_protocol, sasl_mechanism 등)
     )
 
@@ -79,6 +82,8 @@ def async_log_api_stats(endpoint, method, status, user_id):
             producer.flush()
         except Exception as e:
             print(f"Kafka logging error: {str(e)}")
+            print(f"Kafka server: {os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092')}")
+            print(f"Topic: api-logs")
     
     # 새로운 스레드에서 로깅 실행
     Thread(target=_log).start()
