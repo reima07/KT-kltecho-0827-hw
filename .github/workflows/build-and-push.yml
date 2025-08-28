@@ -37,13 +37,13 @@ jobs:
           password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
 
       # 4단계: 현재 날짜와 시간 가져오기 (이미지 태그용)
-      # YYYYMMDD_HHMMSS 형식으로 날짜와 시간 생성하여 이미지 태그로 사용
-      - name: Get current date and time
+      # YYYYMMDD_HHMMSS 형식으로 한국 시간(KST) 생성하여 이미지 태그로 사용
+      - name: Get current date and time (KST)
         id: datetime
-        run: echo "datetime=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+        run: echo "datetime=$(TZ='Asia/Seoul' date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
 
       # 5단계: Docker 이미지 빌드 및 ACR 푸시
-      # kltecho_jiwoo_날짜시간-backend라는 이름으로 이미지 빌드
+      # kltecho_jiwoo_날짜시간-backend라는 이름으로 이미지 빌드 (한국 시간 기준)
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |
@@ -77,13 +77,13 @@ jobs:
           password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
 
       # 4단계: 현재 날짜와 시간 가져오기 (이미지 태그용)
-      # YYYYMMDD_HHMMSS 형식으로 날짜와 시간 생성하여 이미지 태그로 사용
-      - name: Get current date and time
+      # YYYYMMDD_HHMMSS 형식으로 한국 시간(KST) 생성하여 이미지 태그로 사용
+      - name: Get current date and time (KST)
         id: datetime
-        run: echo "datetime=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+        run: echo "datetime=$(TZ='Asia/Seoul' date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
 
       # 5단계: Docker 이미지 빌드 및 ACR 푸시
-      # kltecho_jiwoo_날짜시간-frontend라는 이름으로 이미지 빌드
+      # kltecho_jiwoo_날짜시간-frontend라는 이름으로 이미지 빌드 (한국 시간 기준)
       # 날짜시간 태그와 latest 태그 두 가지로 푸시
       - name: Build and push Docker image to ACR
         run: |

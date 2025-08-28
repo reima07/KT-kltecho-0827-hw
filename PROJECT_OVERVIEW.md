@@ -82,13 +82,14 @@ CI/CD: GitHub Actions (예정)
 #### 4. CI/CD 파이프라인
 - [x] **GitHub Actions 워크플로우 생성** (Docker 빌드 + ACR 푸시)
 - [x] **수동 배포 스크립트 생성** (jiwoo 네임스페이스)
-- [x] **이미지 태깅 시스템** (날짜시간 기반)
+- [x] **이미지 태깅 시스템** (한국 시간 기반 날짜시간)
 - [x] **Azure Container Registry 연동** 준비
+- [x] **GitHub 저장소 연결** 완료
 
 ### 🔄 진행 중인 작업
-- [ ] **Git 저장소 설정**
-- [ ] **GitHub Actions Secrets 설정**
-- [ ] **Azure Container Registry 설정**
+- [ ] **GitHub Actions Secrets 설정** (ACR 정보 3개)
+- [ ] **Azure Container Registry 생성**
+- [ ] **배포 테스트**
 
 ### 📋 예정된 작업
 
@@ -163,11 +164,12 @@ CI/CD: GitHub Actions (예정)
 - **MariaDB**: 사용자 `jiwoo`, 비밀번호 `jiwoo1234!`, DB `jiwoo_db`
 
 ### Docker 이미지
-- **Backend**: `npr04191/0827_hw_local:backend`
-- **Frontend**: `npr04191/0827_hw_local:frontend`
+- **Backend**: `{ACR_LOGIN_SERVER}/kltecho_jiwoo_날짜시간-backend`
+- **Frontend**: `{ACR_LOGIN_SERVER}/kltecho_jiwoo_날짜시간-frontend`
+- **태그 형식**: 한국 시간(KST) 기반 YYYYMMDD_HHMMSS
 
 ### Kubernetes 리소스
-- **네임스페이스**: default
+- **네임스페이스**: jiwoo (전용 네임스페이스)
 - **접두사**: jiwoo- (모든 리소스)
 - **서비스 타입**: ClusterIP (내부), NodePort (외부)
 
@@ -192,43 +194,40 @@ CI/CD: GitHub Actions (예정)
 
 ## 🚀 다음 단계
 
-### 1. Git 저장소 설정
+### 1. GitHub Actions Secrets 설정
 ```bash
-# 새 GitHub 저장소 생성
-# 원격 저장소 연결
-git remote add origin https://github.com/npr04191/0827_hw.git
-git push -u origin main
+# GitHub 저장소 → Settings → Secrets and variables → Actions
+# 다음 3개 시크릿 추가:
+# - ACR_LOGIN_SERVER: ACR 서버 주소
+# - ACR_USERNAME: ACR 사용자명
+# - ACR_PASSWORD: ACR 비밀번호
 ```
 
-### 2. CI/CD 파이프라인 구축
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Azure
-on: [push]
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build and push Docker images
-    - name: Deploy to Azure Kubernetes Service
+### 2. Azure Container Registry 생성
+```bash
+# Azure Container Registry 생성
+az acr create --name ktech4 --resource-group jiwoo-rg --sku Basic --admin-enabled true
+
+# ACR 정보 확인
+az acr credential show --name ktech4 --query 'passwords[0].value' -o tsv
 ```
 
-### 3. Azure 리소스 생성
+### 3. 배포 테스트
 ```bash
-# Azure Container Registry
-az acr create --name jiwooacr --resource-group myResourceGroup
+# 배포 스크립트 실행
+./deploy-to-jiwoo-namespace.sh
 
-# Azure Kubernetes Service
-az aks create --resource-group myResourceGroup --name jiwoo-aks --node-count 3
+# 정리 스크립트 실행 (필요시)
+./cleanup-jiwoo-namespace.sh
 ```
 
 ## 📞 연락처 및 참고사항
 
 - **개발자**: Jiwoo
-- **Docker Hub**: npr04191
-- **프로젝트**: 0827_hw_local
+- **GitHub 저장소**: https://github.com/reima07/KT-kltecho-0827-hw
+- **프로젝트**: 0827_hw
 - **목적**: Kubernetes 학습 및 Azure CI/CD 구축
+- **상태**: GitHub Actions + 수동 배포 하이브리드 방식
 
 ---
 

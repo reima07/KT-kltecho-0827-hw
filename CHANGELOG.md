@@ -349,9 +349,10 @@ spec:
 - **파일**: `.github/workflows/build-and-push.yml`
   - Docker 이미지 빌드 및 ACR 푸시 자동화
   - 백엔드/프론트엔드 병렬 빌드
-  - 날짜시간 태그 (YYYYMMDD_HHMMSS) 및 latest 태그 생성
+  - 한국 시간(KST) 기반 날짜시간 태그 (YYYYMMDD_HHMMSS) 및 latest 태그 생성
   - main, master, develop 브랜치 푸시 시 트리거
   - 이미지 이름: `kltecho_jiwoo_날짜시간-backend/frontend`
+  - ACR Secrets 변수화: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`
 
 #### 수동 배포 스크립트 생성
 - **파일**: `deploy-to-jiwoo-namespace.sh`
@@ -413,16 +414,15 @@ spec:
 
 ### 10. 필요한 GitHub Secrets
 
-#### Azure Container Registry
+#### Azure Container Registry (3개만)
+- `ACR_LOGIN_SERVER`: ACR 서버 주소 (예: ktech4.azurecr.io)
 - `ACR_USERNAME`: ACR 관리자 사용자명
 - `ACR_PASSWORD`: ACR 관리자 비밀번호
 
-#### Azure 인증
-- `AZURE_CREDENTIALS`: 서비스 주체 JSON 인증 정보
-
-#### Azure 리소스
-- `AZURE_RESOURCE_GROUP`: 리소스 그룹 이름
-- `AKS_CLUSTER_NAME`: AKS 클러스터 이름
+#### 참고: 불필요한 Secrets
+- ~~AZURE_CREDENTIALS~~ - ACR만 사용하므로 불필요
+- ~~AZURE_RESOURCE_GROUP~~ - ACR만 사용하므로 불필요
+- ~~AKS_CLUSTER_NAME~~ - 직접 배포하므로 불필요
 
 ### 11. 배포 프로세스
 
@@ -449,9 +449,10 @@ git push origin main
 - **빌드**: GitHub Actions 자동화 (Docker 이미지 빌드 + ACR 푸시)
 - **배포**: 수동 스크립트 (학습용 kubectl 명령어)
 - **네임스페이스**: jiwoo 전용 네임스페이스 사용
+- **시간대**: 한국 시간(KST) 기반 이미지 태깅
 
 #### 배포 프로세스
-1. **코드 푸시** → GitHub Actions 자동 빌드
+1. **코드 푸시** → GitHub Actions 자동 빌드 (한국 시간 태그)
 2. **스크립트 실행** → `./deploy-to-jiwoo-namespace.sh`
 3. **정리 필요시** → `./cleanup-jiwoo-namespace.sh`
 
@@ -459,6 +460,10 @@ git push origin main
 - **프론트엔드**: http://localhost:30080
 - **백엔드 API**: http://localhost:5000
 - **네임스페이스**: jiwoo
+
+#### GitHub 저장소
+- **URL**: https://github.com/reima07/KT-kltecho-0827-hw
+- **상태**: 완전히 업로드됨 (21개 파일, 1,527줄 추가)
 
 ## 📝 학습 내용
 
@@ -499,9 +504,10 @@ git push origin main
 │   ├── jiwoo-*-init-job.yaml    # 초기화 Job
 │   └── *-values.yaml           # Helm 차트 설정
 ├── .github/workflows/        # GitHub Actions 워크플로우
-│   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시
+│   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시 (한국 시간 태깅)
 ├── deploy-to-jiwoo-namespace.sh    # 배포 스크립트
 ├── cleanup-jiwoo-namespace.sh      # 정리 스크립트
+├── env.example               # 환경변수 템플릿 (참고용)
 ├── CHANGELOG.md             # 변경사항 기록
 ├── PROJECT_OVERVIEW.md      # 프로젝트 개요
 └── README.md               # 기본 문서
