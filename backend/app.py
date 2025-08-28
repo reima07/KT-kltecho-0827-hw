@@ -74,7 +74,10 @@ def log_to_redis(action, details):
 def async_log_api_stats(endpoint, method, status, user_id):
     def _log():
         try:
+            print(f"Creating Kafka producer for {endpoint}...")
             producer = get_kafka_producer()
+            print(f"Kafka producer created successfully")
+            
             log_data = {
                 'timestamp': datetime.now().isoformat(),
                 'endpoint': endpoint,
@@ -83,12 +86,15 @@ def async_log_api_stats(endpoint, method, status, user_id):
                 'user_id': user_id,
                 'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
             }
+            print(f"Sending message to Kafka: {log_data}")
             producer.send('api-logs', log_data)
             producer.flush()
+            print(f"Message sent to Kafka successfully")
         except Exception as e:
             print(f"Kafka logging error: {str(e)}")
             print(f"Kafka server: {os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092')}")
             print(f"Topic: api-logs")
+            print(f"Error details: {type(e).__name__}")
     
     # 새로운 스레드에서 로깅 실행
     Thread(target=_log).start()
