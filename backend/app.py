@@ -280,10 +280,6 @@ def get_kafka_logs():
             'api-logs',
             bootstrap_servers=os.getenv('KAFKA_SERVERS', 'my-kafka:9092'),
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            security_protocol='SASL_PLAINTEXT',
-            sasl_mechanism='PLAIN',
-            sasl_plain_username=os.getenv('KAFKA_USERNAME', 'user1'),
-            sasl_plain_password=os.getenv('KAFKA_PASSWORD', ''),
             group_id='api-logs-viewer',
             auto_offset_reset='earliest',
             consumer_timeout_ms=5000
@@ -294,11 +290,8 @@ def get_kafka_logs():
             for message in consumer:
                 logs.append({
                     'timestamp': message.value['timestamp'],
-                    'endpoint': message.value['endpoint'],
-                    'method': message.value['method'],
-                    'status': message.value['status'],
-                    'user_id': message.value['user_id'],
-                    'message': message.value['message']
+                    'action': f"{message.value['method']} {message.value['endpoint']}",
+                    'details': message.value['message']
                 })
                 if len(logs) >= 100:
                     break
