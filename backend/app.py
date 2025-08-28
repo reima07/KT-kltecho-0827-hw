@@ -42,7 +42,7 @@ def get_redis_connection():
 # [변경사항] SASL 인증 제거하여 단순 연결로 변경
 def get_kafka_producer():
     return KafkaProducer(
-        bootstrap_servers=os.getenv('KAFKA_SERVERS', 'my-kafka:9092'),
+        bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
         # [변경] SASL 인증 설정 제거 (security_protocol, sasl_mechanism 등)
     )
@@ -278,7 +278,7 @@ def get_kafka_logs():
     try:
         consumer = KafkaConsumer(
             'api-logs',
-            bootstrap_servers=os.getenv('KAFKA_SERVERS', 'my-kafka:9092'),
+            bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             group_id='api-logs-viewer',
             auto_offset_reset='earliest',
