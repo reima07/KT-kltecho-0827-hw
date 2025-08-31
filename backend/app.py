@@ -179,7 +179,7 @@ def login_required(f):
     return decorated_function
 
 # MariaDB 엔드포인트
-@app.route('/db/message', methods=['POST'])
+@app.route('/api/db/message', methods=['POST'])
 @login_required
 def save_to_db():
     try:
@@ -218,7 +218,7 @@ def save_to_db():
         log_to_redis('db_insert_error', str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/db/messages', methods=['GET'])
+@app.route('/api/db/messages', methods=['GET'])
 @login_required
 def get_from_db():
     try:
@@ -240,7 +240,7 @@ def get_from_db():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Redis 로그 조회
-@app.route('/logs/redis', methods=['GET'])
+@app.route('/api/logs/redis', methods=['GET'])
 def get_redis_logs():
     try:
         redis_client = get_redis_connection()
@@ -251,7 +251,7 @@ def get_redis_logs():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # 회원가입 엔드포인트
-@app.route('/register', methods=['POST'])
+@app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.json
@@ -284,7 +284,7 @@ def register():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # 로그인 엔드포인트
-@app.route('/login', methods=['POST'])
+@app.route('/api/login', methods=['POST'])
 def login():
     try:
         data = request.json
@@ -346,7 +346,7 @@ def login():
         return jsonify({"status": "error", "message": "로그인 처리 중 오류가 발생했습니다"}), 500
 
 # 로그아웃 엔드포인트
-@app.route('/logout', methods=['POST'])
+@app.route('/api/logout', methods=['POST'])
 def logout():
     try:
         if 'user_id' in session:
@@ -363,7 +363,7 @@ def logout():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # 메시지 검색 (DB에서 검색)
-@app.route('/db/messages/search', methods=['GET'])
+@app.route('/api/db/messages/search', methods=['GET'])
 @login_required
 def search_messages():
     try:
@@ -389,7 +389,7 @@ def search_messages():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Kafka 로그 조회 엔드포인트 (Redis에서 조회)
-@app.route('/logs/kafka', methods=['GET'])
+@app.route('/api/logs/kafka', methods=['GET'])
 @login_required
 def get_kafka_logs():
     try:

@@ -33,9 +33,24 @@
     - `@opentelemetry/api==1.4.1`, `@opentelemetry/sdk-web==0.33.0`
     - `@opentelemetry/instrumentation-*==0.33.0`
 
-- [ ] **새로운 이미지 빌드 및 배포**
-- [ ] **Collector 연결 테스트**
-- [ ] **로그 및 트레이스 데이터 확인**
+### [2025-08-31] - 4단계: Collector 연동 테스트 ✅
+- [x] **새로운 이미지 빌드 및 배포**
+  - 백엔드: OpenTelemetry 통합 완료, 구조화된 로깅 구현
+  - 프론트엔드: 최신 OpenTelemetry 통합, Node 20 업그레이드
+  - 옵셔널 체이닝 문제 해결로 빌드 성공
+
+- [x] **롤아웃 완료**
+  - `kubectl rollout restart deployment/jiwoo-backend -n jiwoo` ✅
+  - `kubectl rollout restart deployment/jiwoo-frontend -n jiwoo` ✅
+  - 새로운 Pod들이 성공적으로 실행 중
+
+- [x] **OpenTelemetry 초기화 확인**
+  - 백엔드 로그: "OpenTelemetry 설정 완료 - Collector: http://collector.lgtm.20.249.154.255.nip.io"
+  - 로깅 설정: "로깅 설정 완료 - 레벨: INFO"
+  - Flask 앱 정상 실행 중
+
+- [ ] **실제 로그 및 트레이스 데이터 확인** (다음 단계)
+- [ ] **Grafana에서 데이터 확인** (다음 단계)
 
 ### [2025-08-31] - 3단계: 프론트엔드 로깅 코드 구현 ✅
 - [x] **OpenTelemetry 초기화**
