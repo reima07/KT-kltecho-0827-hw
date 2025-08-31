@@ -5,351 +5,147 @@
 - **기술 스택**: Python Flask (Backend) + Vue.js (Frontend) + MariaDB + Redis + Kafka
 - **현재 상태**: 로컬 K8s에서 완전히 동작 중
 
-## 🚀 주요 변경사항 (원본 대비)
+---
 
-### 2024-08-28 - CI/CD 파이프라인 및 ACR 인증 설정
+## 🚀 주요 변경사항 (시간순)
 
-#### GitHub Actions CI/CD 워크플로우 설정
-- **파일**: `.github/workflows/build-and-push.yml`
-- **기능**: Docker 이미지 빌드 및 Azure Container Registry(ACR) 푸시
-- **트리거**: main, master, develop 브랜치 푸시 시
-- **이미지 태그**: 한국 시간(KST) 기준 `YYYYMMDD_HHMMSS` 형식 + `latest`
-- **필요한 Secrets**: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`
+### [2025-08-31] 🔧 카프카 로그 조회 문제 해결 및 프론트엔드 개선
 
-#### ACR 인증 설정
-- **파일**: `k8s/jiwoo-acr-secret.yaml`
-- **기능**: Kubernetes에서 ACR 이미지 풀링을 위한 인증
-- **타입**: `kubernetes.io/dockerconfigjson`
-- **배포 파일 수정**: `imagePullSecrets` 추가
+#### 🔧 수정사항
+- **카프카 로그 조회 문제 해결**
+  - 카프카 SASL 인증 제거 (인증 없이 평면 연결 사용)
+  - Redis를 통한 카프카 로그 저장 구현 (이중 저장 방식)
+  - 카프카 연결 실패 시에도 Redis에서 로그 조회 가능
+  - 토픽 자동 생성 로직 개선
 
-#### 이미지 이름 통일
-- **GitHub Actions**: `kltecho_jiwoo-backend:latest`, `kltecho_jiwoo-frontend:latest`
-- **배포 파일**: `kltecho_jiwoo-backend:latest`, `kltecho_jiwoo-frontend:latest`
-- **이전 문제**: 하이픈(-) vs 언더스코어(_) 불일치 해결
+- **프론트엔드 표시 개선**
+  - 카프카 로그 표시 형식 수정 (`log.action`, `log.details` → `log.method`, `log.endpoint`, `log.message`)
+  - MariaDB 메시지 표시를 최근 10개로 제한
+  - 모든 로그/메시지 표시에 일관된 10개 제한 적용
 
-#### 배포 스크립트 업데이트
-- **파일**: `deploy-to-jiwoo-namespace.sh`
-- **추가**: ACR 시크릿 적용 단계
-- **순서**: Secret → ACR Secret → Backend → Frontend
+#### 🐛 버그 수정
+- 카프카 로그 조회 시 빈 배열 반환 문제 해결
+- 프론트엔드에서 카프카 로그가 표시되지 않는 문제 해결
+- 메시지 목록이 너무 많이 표시되는 문제 해결
 
-#### 리소스 최적화 (이전)
-- **MariaDB**: CPU 500m → 250m, Memory 1Gi → 512Mi
-- **Redis**: CPU 200m → 100m, Memory 256Mi → 128Mi  
-- **Kafka**: Controller CPU 400m → 200m, Memory 512Mi → 256Mi
-- **Zookeeper**: CPU 200m → 100m, Memory 256Mi → 128Mi
+#### 📝 기술적 개선사항
+- **이중 저장 방식**: 카프카 + Redis 동시 저장으로 안정성 향상
+- **에러 처리 강화**: 카프카 연결 실패 시에도 Redis에서 로그 조회 가능
+- **사용자 경험 개선**: 모든 목록을 최근 10개로 제한하여 가독성 향상
 
-### 2024-08-27 - 초기 설정 및 리소스 최적화
+#### 🔄 배포 과정
+1. 백엔드 코드 수정 (카프카 인증 제거, Redis 이중 저장)
+2. 프론트엔드 코드 수정 (표시 형식 수정, 10개 제한)
+3. GitHub Actions를 통한 자동 빌드 및 ACR 푸시
+4. Kubernetes 롤아웃 재시작으로 새로운 이미지 배포
 
-### 1. Helm Charts 설정 (Bitnami)
+---
 
-#### Redis 설정 (`k8s/redis-values.yaml`)
-```yaml
-auth:
-  enabled: true
-  password: "New1234!"
-architecture: standalone
-service:
-  type: ClusterIP
-persistence:
-  enabled: true
-  size: 1Gi
-```
+### [2025-08-30] 🏗️ 초기 프로젝트 설정
 
-#### Kafka 설정 (`k8s/kafka-values.yaml`)
-```yaml
-controller:
-  replicaCount: 3  # 처음 1개 → 3개로 변경
-zookeeper:
-  enabled: true
-  replicaCount: 3
-persistence:
-  enabled: true
-  size: 1Gi
-service:
-  type: ClusterIP
-auth:
-  enabled: false  # SASL 인증 비활성화
-```
+#### ✨ 신규 기능
+- **마이크로서비스 아키텍처 구축**
+  - Frontend: Vue.js + Nginx
+  - Backend: Python Flask
+  - Database: MariaDB
+  - Cache: Redis
+  - Message Queue: Apache Kafka
 
-#### MariaDB 설정 (`k8s/mariadb-values.yaml`)
-```yaml
-auth:
-  enabled: true
-  username: "jiwoo"
-  password: "jiwoo1234!"
-  database: "jiwoo_db"
-primary:
-  persistence:
-    enabled: true
-    size: 1Gi
-service:
-  type: ClusterIP
-```
+- **Kubernetes 배포 환경**
+  - Helm을 통한 Kafka, MariaDB, Redis 설치
+  - LoadBalancer 서비스를 통한 외부 접근
+  - 자동화된 초기화 Job
 
-### 2. 데이터베이스 스키마 변경 (`db/init.sql`)
+- **CI/CD 파이프라인**
+  - GitHub Actions를 통한 자동 빌드
+  - Azure Container Registry (ACR) 연동
+  - Docker 이미지 자동 푸시
 
-**완전히 재작성:**
-```sql
--- 데이터베이스 생성
-CREATE DATABASE IF NOT EXISTS jiwoo_db;
-USE jiwoo_db;
+#### 🔐 인증 시스템
+- 사용자 회원가입/로그인 기능
+- 세션 기반 인증
+- Redis를 통한 세션 관리
 
--- 사용자 테이블 생성
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+#### 📊 로깅 시스템
+- Redis를 통한 API 호출 로그 저장
+- Kafka를 통한 API 통계 로그 저장
+- 실시간 로그 조회 기능
 
--- 메시지 테이블 생성
-CREATE TABLE IF NOT EXISTS messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    message TEXT NOT NULL,
-    user_id VARCHAR(255),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user_id (user_id),
-    INDEX idx_created_at (created_at)
-);
+#### 🔍 검색 기능
+- MariaDB 메시지 검색
+- 페이지네이션 지원
+- 사용자별 메시지 관리
 
--- 샘플 데이터 삽입
-INSERT IGNORE INTO users (username, password) VALUES 
-('admin', 'admin123'),
-('testuser', 'test123');
-```
+---
 
-### 3. Kubernetes 배포 파일 생성
+### [2025-08-29] 🚀 프로젝트 초기화
 
-#### 백엔드 배포 (`k8s/jiwoo-backend-deployment.yaml`)
-- **이름 변경**: `backend` → `jiwoo-backend`
-- **이미지**: `npr04191/0827_hw_local:backend`
-- **환경변수 추가**: `MYSQL_DATABASE: "jiwoo_db"`
-- **서비스 이름**: `jiwoo-backend-service`
+#### 🚀 프로젝트 시작
+- Kubernetes 학습을 위한 마이크로서비스 프로젝트 생성
+- Azure 클라우드 환경에서 CI/CD 구축 목표
+- 개발자: Jiwoo
+- 목적: Kubernetes와 Azure 클라우드 기술 학습
 
-#### 프론트엔드 배포 (`k8s/jiwoo-frontend-deployment.yaml`)
-- **이름 변경**: `frontend` → `jiwoo-frontend`
-- **이미지**: `npr04191/0827_hw_local:frontend`
-- **서비스 이름**: `jiwoo-frontend-service`
-
-#### Secret 설정 (`k8s/jiwoo-backend-secret.yaml`)
-```yaml
-FLASK_SECRET_KEY: "andpamRlZmluaXRlbHlzZWN1cmVrZXlmb3JqaXdvbyI="  # jiwoo flask secret key
-MYSQL_PASSWORD: "aml3b28xMjM0IQ=="  # jiwoo1234!를 base64로 인코딩
-REDIS_PASSWORD: "TmV3MTIzNCE="  # New1234!를 base64로 인코딩
-KAFKA_PASSWORD: ""  # Kafka는 인증 없이 설정
-```
-
-### 4. 백엔드 코드 수정 (`backend/app.py`)
-
-#### 데이터베이스 연결 수정
-```python
-# [변경사항] database를 환경변수로 변경하여 jiwoo_db 사용
-def get_db_connection():
-    return mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST', 'my-mariadb'),
-        user=os.getenv('MYSQL_USER', 'testuser'),
-        password=os.getenv('MYSQL_PASSWORD'),
-        database=os.getenv('MYSQL_DATABASE', 'jiwoo_db'),  # [변경] testdb → jiwoo_db
-        connect_timeout=30
-    )
-```
-
-#### Kafka 연결 수정
-```python
-# [변경사항] SASL 인증 제거하여 단순 연결로 변경
-def get_kafka_producer():
-    return KafkaProducer(
-        bootstrap_servers=os.getenv('KAFKA_SERVERS', 'my-kafka:9092'),
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        # [변경] SASL 인증 설정 제거 (security_protocol, sasl_mechanism 등)
-    )
-```
-
-#### 메시지 저장 시 user_id 추가 (최근 수정)
-```python
-# [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
-sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
-cursor.execute(sql, (data['message'], user_id, datetime.now()))
-```
-
-### 5. 프론트엔드 설정 수정 (`frontend/nginx.conf`)
-
-```nginx
-location /api/ {
-    rewrite ^/api/(.*) /$1 break;
-    # [변경사항] 백엔드 서비스 이름을 jiwoo- 접두사로 변경
-    proxy_pass http://jiwoo-backend-service:5000;  # [변경] backend-service → jiwoo-backend-service
-}
-```
-
-### 6. 자동화 스크립트 생성
-
-#### 배포 스크립트 (`build-and-deploy.sh`)
-```bash
-#!/bin/bash
-# Docker 이미지 빌드
-docker build -t jiwoo-backend:latest ./backend
-docker build -t jiwoo-frontend:latest ./frontend
-
-# Helm으로 인프라 설치
-helm install jiwoo-redis bitnami/redis -f k8s/redis-values.yaml
-helm install jiwoo-kafka bitnami/kafka -f k8s/kafka-values.yaml
-helm install jiwoo-mariadb bitnami/mariadb -f k8s/mariadb-values.yaml
-
-# 서비스 준비 대기 (타임아웃 최적화)
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis --timeout=120s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kafka --timeout=120s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=mariadb --timeout=120s
-
-# 초기화 Job 실행
-kubectl apply -f k8s/jiwoo-mariadb-init-job.yaml
-kubectl apply -f k8s/jiwoo-redis-init-job.yaml
-
-# Job 완료 대기 (타임아웃 최적화)
-kubectl wait --for=condition=complete job/jiwoo-mariadb-init --timeout=60s
-kubectl wait --for=condition=complete job/jiwoo-redis-init --timeout=60s
-
-# 애플리케이션 배포
-kubectl apply -f k8s/jiwoo-backend-secret.yaml
-kubectl apply -f k8s/jiwoo-backend-deployment.yaml
-kubectl apply -f k8s/jiwoo-frontend-deployment.yaml
-```
-
-#### 정리 스크립트 (`cleanup.sh`)
-```bash
-#!/bin/bash
-# 애플리케이션 삭제
-kubectl delete -f k8s/jiwoo-frontend-deployment.yaml
-kubectl delete -f k8s/jiwoo-backend-deployment.yaml
-kubectl delete -f k8s/jiwoo-backend-secret.yaml
-
-# 초기화 Job 삭제
-kubectl delete -f k8s/jiwoo-mariadb-init-job.yaml
-kubectl delete -f k8s/jiwoo-redis-init-job.yaml
-
-# Helm 릴리스 삭제
-helm uninstall jiwoo-mariadb
-helm uninstall jiwoo-kafka
-helm uninstall jiwoo-redis
-
-# Docker 이미지 삭제
-docker rmi jiwoo-backend:latest
-docker rmi jiwoo-frontend:latest
-```
-
-### 7. 자동화 Job 생성
-
-#### MariaDB 초기화 Job (`k8s/jiwoo-mariadb-init-job.yaml`)
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: jiwoo-mariadb-init
-spec:
-  template:
-    spec:
-      containers:
-      - name: mariadb-init
-        image: docker.io/bitnami/mariadb:12.0.2-debian-12-r0
-        command:
-        - /bin/bash
-        - -c
-        - |
-          # MariaDB 준비 대기
-          until mysql -h jiwoo-mariadb -u jiwoo -pjiwoo1234! -e "SELECT 1"; do
-            sleep 5
-          done
-          
-          # 데이터베이스 및 테이블 생성
-          mysql -h jiwoo-mariadb -u jiwoo -pjiwoo1234! << 'EOF'
-          CREATE DATABASE IF NOT EXISTS jiwoo_db;
-          USE jiwoo_db;
-          
-          CREATE TABLE IF NOT EXISTS users (
-              id INT AUTO_INCREMENT PRIMARY KEY,
-              username VARCHAR(255) UNIQUE NOT NULL,
-              password VARCHAR(255) NOT NULL,
-              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          );
-          
-          CREATE TABLE IF NOT EXISTS messages (
-              id INT AUTO_INCREMENT PRIMARY KEY,
-              message TEXT NOT NULL,
-              user_id VARCHAR(255),
-              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-              INDEX idx_user_id (user_id),
-              INDEX idx_created_at (created_at)
-          );
-          
-          INSERT IGNORE INTO users (username, password) VALUES 
-          ('admin', 'admin123'),
-          ('testuser', 'test123');
-          EOF
-      restartPolicy: OnFailure
-```
-
-#### Redis 초기화 Job (`k8s/jiwoo-redis-init-job.yaml`)
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: jiwoo-redis-init
-spec:
-  template:
-    spec:
-      containers:
-      - name: redis-init
-        image: docker.io/bitnami/redis:8.2.1-debian-12-r0
-        command:
-        - /bin/bash
-        - -c
-        - |
-          # Redis 준비 대기
-          until redis-cli -h jiwoo-redis-master -a New1234! ping; do
-            sleep 5
-          done
-          
-          # 테스트 데이터 추가
-          redis-cli -h jiwoo-redis-master -a New1234! lpush api_logs '{"timestamp":"2025-08-28T00:30:00","action":"init","details":"Redis 초기화 완료"}'
-          redis-cli -h jiwoo-redis-master -a New1234! lpush api_logs '{"timestamp":"2025-08-28T00:30:01","action":"test","details":"Redis 연결 테스트 성공"}'
-      restartPolicy: OnFailure
-```
+---
 
 ## 🔧 해결된 문제들
 
-### 1. 이미지 Pull 문제
-- **문제**: `ErrImageNeverPull` 오류
-- **해결**: Docker Hub 사용자 저장소로 변경 (`npr04191/0827_hw_local`)
+### 1. ImagePullBackOff / 401 Unauthorized 오류
+**문제**: ACR 인증 설정 누락으로 인한 이미지 Pull 실패
+**해결**: ACR Secret 생성 및 배포 파일에 `imagePullSecrets` 추가
+**결과**: ✅ ACR에서 이미지 정상 Pull
 
-### 2. 데이터베이스 연결 문제
-- **문제**: `Unknown database 'testdb'` 오류
-- **해결**: 환경변수로 데이터베이스 이름 변경 (`jiwoo_db`)
+### 2. GitHub Push Protection 차단
+**문제**: 평문 비밀번호가 포함된 파일 푸시 시 차단
+**해결**: base64 인코딩 사용 및 Git 히스토리 리셋
+**결과**: ✅ 보안 정책 준수하며 푸시 성공
 
-### 3. 테이블 없음 문제
-- **문제**: `Table 'jiwoo_db.users' doesn't exist`
-- **해결**: 자동화된 초기화 Job 생성
+### 3. 프론트엔드 외부 접속 불가
+**문제**: NodePort 서비스로는 외부 접속 불가
+**해결**: 서비스 타입을 LoadBalancer로 변경
+**결과**: ✅ 외부에서 프론트엔드 접속 가능
 
-### 4. Kafka CrashLoopBackOff
-- **문제**: 컨트롤러 수 불일치 및 SASL 인증 문제
-- **해결**: 컨트롤러 수 조정 및 SASL 인증 비활성화
+### 4. 리소스 부족 오류
+**문제**: `Insufficient cpu` 오류로 인한 Pod 스케줄링 실패
+**해결**: CPU/메모리 요청량 최적화
+**결과**: ✅ 리소스 효율적 사용
 
-### 5. 사용자 정보 미저장 문제
-- **문제**: 메시지 저장 시 "사용자 없음" 표시
-- **해결**: SQL 쿼리에 `user_id` 추가
+### 5. 데이터베이스 연결 문제
+**문제**: `Unknown database 'testdb'` 오류
+**해결**: 환경변수로 데이터베이스 이름 변경 (`jiwoo_db`)
+**결과**: ✅ MariaDB 정상 연결
 
-### 6. 배포 시간 최적화
-- **문제**: 300초 타임아웃으로 인한 긴 배포 시간
-- **해결**: 120초/60초로 최적화
+### 6. 테이블 없음 문제
+**문제**: `Table 'jiwoo_db.users' doesn't exist`
+**해결**: 자동화된 초기화 Job 생성
+**결과**: ✅ 자동 초기화 완료
+
+### 7. Kafka CrashLoopBackOff
+**문제**: 컨트롤러 수 불일치 및 SASL 인증 문제
+**해결**: 컨트롤러 수 조정 및 SASL 인증 비활성화
+**결과**: ✅ Kafka 정상 작동
+
+### 8. 사용자 정보 미저장 문제
+**문제**: 메시지 저장 시 "사용자 없음" 표시
+**해결**: SQL 쿼리에 `user_id` 추가
+**결과**: ✅ 사용자별 메시지 관리 가능
+
+### 9. 배포 시간 최적화
+**문제**: 300초 타임아웃으로 인한 긴 배포 시간
+**해결**: 120초/60초로 최적화
+**결과**: ✅ 효율적인 배포 시간
+
+---
 
 ## 📊 현재 상태
 
 ### 접속 정보
-- **프론트엔드**: http://localhost:30080
-- **백엔드 API**: http://localhost:5000
+- **프론트엔드**: http://4.230.144.92
+- **백엔드 API**: 내부 클러스터에서만 접근 가능 (포트 5000)
 
 ### 서비스 상태
-- ✅ Frontend: Running
-- ✅ Backend: Running  
+- ✅ Frontend: Running (LoadBalancer)
+- ✅ Backend: Running (ClusterIP)
 - ✅ MariaDB: Running
 - ✅ Redis: Running
 - ✅ Kafka: Running (3개 컨트롤러)
@@ -360,248 +156,23 @@ spec:
 - ✅ 메시지 저장 (사용자 정보 포함)
 - ✅ 메시지 검색
 - ✅ Redis 로그 조회
-- ✅ Kafka API 통계 로깅
+- ✅ Kafka API 통계 로깅 (Redis 기반)
 
 ### CI/CD 파이프라인
-- ✅ GitHub Actions 워크플로우 생성
-- ✅ Azure Container Registry 설정 준비
-- ✅ Azure Kubernetes Service 배포 준비
+- ✅ GitHub Actions 워크플로우
+- ✅ Azure Container Registry 연동
+- ✅ 자동 빌드 및 푸시
+
+---
 
 ## 🚀 다음 단계 (CI/CD)
 
-1. **Git 저장소 설정**
+1. **Git 저장소 설정** ✅
 2. **GitHub Actions 워크플로우 생성** ✅
-3. **Azure Container Registry 설정**
-4. **Azure Kubernetes Service 배포**
+3. **Azure Container Registry 설정** ✅
+4. **Azure Kubernetes Service 배포** (예정)
 
-## 🔄 최근 변경사항 (2025-01-27)
-
-### 8. Azure CI/CD 파이프라인 구축
-
-### 2024-08-28 - 최신 업데이트 및 Kafka 로그 문제 해결
-
-#### 프론트엔드 UI 개선
-- **`frontend/src/App.vue`** 업데이트
-  - Redis 로그: 자동 업데이트 → 버튼 클릭 시 조회
-  - Kafka 로그 섹션 추가
-  - 로그 표시: 최근 10개만 표시
-  - 로그 개수 안내 메시지 추가
-
-#### 백엔드 Kafka 로깅 강화
-- **`backend/app.py`** 업데이트
-  - Kafka Producer/Consumer SASL 인증 설정
-  - 로그인/로그아웃 API에 Kafka 로깅 추가
-  - 상세한 디버그 로그 추가
-  - Consumer 설정 최적화 (고유 group_id, 타임아웃, auto-commit)
-  - Kafka 서버 주소: `jiwoo-kafka:9092` 사용
-
-#### Kafka 설정 개선
-- **`k8s/kafka-values.yaml`** 업데이트
-  - SASL PLAIN 인증 설정 추가
-  - 토픽 자동 생성 활성화
-  - 리소스 최적화 (CPU 100m, Memory 100Mi)
-
-#### 리소스 최적화 (최신)
-- **MariaDB**: CPU 500m → 100m, Memory 512Mi → 50Mi
-- **Redis**: CPU 250m → 50m, Memory 256Mi → 50Mi
-- **Kafka**: CPU 500m → 100m, Memory 512Mi → 100Mi
-
-#### 해결된 문제들
-1. **ImagePullBackOff / 401 Unauthorized**: ACR 인증 설정으로 해결
-2. **GitHub Push Protection**: base64 인코딩으로 해결
-3. **프론트엔드 외부 접속 불가**: LoadBalancer 서비스 타입으로 해결
-4. **리소스 부족 오류**: CPU/메모리 요청 최적화로 해결
-
-#### 진행 중인 문제
-- **Kafka 로그 표시 문제**: 백엔드에서 메시지 전송은 성공하지만 프론트엔드에서 로그 조회 시 빈 응답
-- **진행 상황**: 
-  - SASL 인증 설정 완료
-  - Consumer 설정 최적화 완료
-  - 디버그 로그 추가 완료
-  - 백엔드 재배포 완료
-- **다음 단계**: 백엔드 로그 분석을 통한 정확한 원인 파악
-
-### 8. Azure CI/CD 파이프라인 구축
-
-#### GitHub Actions 워크플로우 생성
-- **파일**: `.github/workflows/build-and-push.yml`
-  - Docker 이미지 빌드 및 ACR 푸시 자동화
-  - 백엔드/프론트엔드 병렬 빌드
-  - 한국 시간(KST) 기반 날짜시간 태그 (YYYYMMDD_HHMMSS) 및 latest 태그 생성
-  - main, master, develop 브랜치 푸시 시 트리거
-  - 이미지 이름: `kltecho_jiwoo_날짜시간-backend/frontend`
-  - ACR Secrets 변수화: `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`
-
-#### 수동 배포 스크립트 생성
-- **파일**: `deploy-to-jiwoo-namespace.sh`
-  - jiwoo 네임스페이스에 모든 리소스 배포
-  - Helm 차트 설치 (Redis, Kafka, MariaDB)
-  - 초기화 Job 실행
-  - 애플리케이션 배포
-  - 배포 상태 확인
-
-- **파일**: `cleanup-jiwoo-namespace.sh`
-  - jiwoo 네임스페이스의 모든 리소스 삭제
-  - 안전한 정리 (확인 메시지 포함)
-  - 네임스페이스까지 완전 삭제
-
-#### Docker 이미지 레지스트리 변경
-- **이전**: Docker Hub (`npr04191/0827_hw_local`)
-- **현재**: Azure Container Registry (`ktech4.azurecr.io/kltecho_jiwoo-*`)
-
-#### Kubernetes 배포 파일 업데이트
-- **백엔드**: `k8s/jiwoo-backend-deployment.yaml`
-  ```yaml
-  # [변경사항] Docker Hub → ACR 이미지 변경
-  image: ktech4.azurecr.io/kltecho_jiwoo-backend:latest
-  ```
-
-- **프론트엔드**: `k8s/jiwoo-frontend-deployment.yaml`
-  ```yaml
-  # [변경사항] Docker Hub → ACR 이미지 변경
-  image: ktech4.azurecr.io/kltecho_jiwoo-frontend:latest
-  ```
-
-#### GitHub Secrets 설정 가이드 생성
-- **파일**: `GITHUB_SECRETS_SETUP.md` (삭제됨)
-  - ACR 인증 정보 설정 방법
-  - Azure 서비스 주체 생성 가이드
-  - AKS 클러스터 연결 방법
-  - 보안 주의사항 및 체크리스트
-
-### 9. 리소스 최적화 및 문제 해결
-
-#### MariaDB CPU 최적화
-- **문제**: CPU 500m 요구로 인한 `Insufficient cpu` 오류
-- **해결**: CPU 요구량을 250m로 50% 감소
-- **파일**: `k8s/mariadb-values.yaml`
-```yaml
-primary:
-  resources:
-    requests:
-      cpu: 250m        # 500m에서 50% 감소
-      memory: 512Mi    # 적절한 메모리 설정
-```
-
-#### Redis/Kafka 리소스 설정
-- **Redis**: CPU 100m, Memory 128Mi 설정
-- **Kafka**: CPU 200m, Memory 256Mi 설정 (기존 유지)
-- **파일**: `k8s/redis-values.yaml`, `k8s/kafka-values.yaml`
-
-#### 배포 스크립트 개선
-- **Helm debug 로깅**: `--debug` 플래그 추가
-- **kubectl verbose**: `-v=1` 플래그 추가
-- **타임아웃 조정**: 600s → 300s (사용자 요청)
-- **파일**: `deploy-to-jiwoo-namespace.sh`
-
-#### 네임스페이스 불일치 해결
-- **문제**: YAML 파일의 `namespace: default`와 스크립트의 `-n jiwoo` 불일치
-- **해결**: 모든 YAML 파일에서 namespace 필드 주석 처리
-- **파일**: `k8s/jiwoo-*.yaml` 모든 파일
-
-#### 이미지 태그 불일치 해결
-- **문제**: GitHub Actions는 날짜시간 태그, YAML은 latest 태그 사용
-- **해결**: 구체적인 날짜시간 태그 사용 (예: `kltecho_jiwoo_20250828_032716-backend`)
-- **파일**: `k8s/jiwoo-backend-deployment.yaml`, `k8s/jiwoo-frontend-deployment.yaml`
-
-### 10. 문서화 개선
-
-#### docs/ 폴더 생성
-- **체계적인 문서 관리**: 프로젝트별 가이드 분리
-- **상세한 문제 해결 가이드**: 실제 발생한 문제들과 해결 방법
-
-#### 리소스 최적화 가이드 (`docs/RESOURCE_OPTIMIZATION.md`)
-- 클러스터 리소스 현황 분석
-- MariaDB/Redis/Kafka 적절한 리소스 설정
-- 모니터링 명령어 모음
-- 개발/프로덕션 환경 권장사항
-
-#### 배포 문제 해결 가이드 (`docs/DEPLOYMENT_TROUBLESHOOTING.md`)
-- 발생한 문제들과 해결 방법 상세 기록
-- 배포 스크립트 개선사항
-- 예방 방법과 체크리스트
-- 디버깅 명령어 모음
-
-#### CI/CD 파이프라인 가이드 (`docs/CI_CD_PIPELINE.md`)
-- GitHub Actions 워크플로우 상세 설명
-- GitHub Secrets 설정 방법
-- Docker 이미지 태깅 전략
-- Azure Container Registry 설정
-- 문제 해결 및 모니터링 방법
-
-### 11. 워크플로우 기능 상세
-
-#### 빌드 및 푸시 워크플로우 (`build-and-push.yml`)
-```yaml
-# 주요 기능
-- Azure Container Registry 로그인
-- Docker Buildx 멀티 플랫폼 빌드
-- 날짜 기반 이미지 태깅
-- 백엔드/프론트엔드 병렬 처리
-```
-
-#### AKS 배포 워크플로우 (`deploy-to-aks.yml`)
-```yaml
-# 주요 기능
-- Azure CLI 자동 로그인
-- AKS 클러스터 자격 증명 가져오기
-- Helm 차트 자동 설치 (Redis, Kafka, MariaDB)
-- 초기화 Job 자동 실행
-- 배포 상태 실시간 모니터링
-```
-
-### 12. 필요한 GitHub Secrets
-
-#### Azure Container Registry (3개만)
-- `ACR_LOGIN_SERVER`: ACR 서버 주소 (예: ktech4.azurecr.io)
-- `ACR_USERNAME`: ACR 관리자 사용자명
-- `ACR_PASSWORD`: ACR 관리자 비밀번호
-
-#### 참고: 불필요한 Secrets
-- ~~AZURE_CREDENTIALS~~ - ACR만 사용하므로 불필요
-- ~~AZURE_RESOURCE_GROUP~~ - ACR만 사용하므로 불필요
-- ~~AKS_CLUSTER_NAME~~ - 직접 배포하므로 불필요
-
-### 13. 배포 프로세스
-
-#### 1단계: 코드 푸시
-```bash
-git push origin main
-```
-
-#### 2단계: 자동 빌드 (GitHub Actions)
-- Docker 이미지 빌드
-- ACR에 이미지 푸시
-- 날짜 태그 및 latest 태그 생성
-
-#### 3단계: 자동 배포 (GitHub Actions)
-- AKS 클러스터 연결
-- Helm 차트 설치 (인프라)
-- 초기화 Job 실행
-- 애플리케이션 배포
-- 배포 상태 확인
-
-### 14. 최종 배포 구조
-
-#### 하이브리드 배포 방식
-- **빌드**: GitHub Actions 자동화 (Docker 이미지 빌드 + ACR 푸시)
-- **배포**: 수동 스크립트 (학습용 kubectl 명령어)
-- **네임스페이스**: jiwoo 전용 네임스페이스 사용
-- **시간대**: 한국 시간(KST) 기반 이미지 태깅
-
-#### 배포 프로세스
-1. **코드 푸시** → GitHub Actions 자동 빌드 (한국 시간 태그)
-2. **스크립트 실행** → `./deploy-to-jiwoo-namespace.sh`
-3. **정리 필요시** → `./cleanup-jiwoo-namespace.sh`
-
-#### 접속 정보
-- **프론트엔드**: http://localhost:30080
-- **백엔드 API**: http://localhost:5000
-- **네임스페이스**: jiwoo
-
-#### GitHub 저장소
-- **URL**: https://github.com/reima07/KT-kltecho-0827-hw
-- **상태**: 완전히 업로드됨 (21개 파일, 1,527줄 추가)
+---
 
 ## 📝 학습 내용
 
@@ -620,6 +191,8 @@ git push origin main
 - **배포 자동화**: 스크립트를 통한 일관된 배포
 - **타임아웃 최적화**: 효율적인 배포 시간 관리
 - **CI/CD 자동화**: GitHub Actions를 통한 Azure 클라우드 배포
+
+---
 
 ## 📁 프로젝트 구조 (최종)
 
@@ -642,15 +215,24 @@ git push origin main
 │   ├── jiwoo-*-init-job.yaml    # 초기화 Job
 │   └── *-values.yaml           # Helm 차트 설정
 ├── .github/workflows/        # GitHub Actions 워크플로우
-│   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시 (한국 시간 태깅)
+│   └── build-and-push.yml   # Docker 빌드 및 ACR 푸시
 ├── docs/                    # 문서화
-│   ├── RESOURCE_OPTIMIZATION.md    # 리소스 최적화 가이드
-│   ├── DEPLOYMENT_TROUBLESHOOTING.md # 배포 문제 해결 가이드
-│   └── CI_CD_PIPELINE.md           # CI/CD 파이프라인 가이드
+│   ├── CHANGELOG.md         # 변경사항 기록 (이 파일)
+│   ├── deployment-issues.md # 배포 문제 해결 가이드
+│   └── PROJECT_HISTORY.md   # 전체 진행 과정
 ├── deploy-to-jiwoo-namespace.sh    # 배포 스크립트
 ├── cleanup-jiwoo-namespace.sh      # 정리 스크립트
-├── env.example               # 환경변수 템플릿 (참고용)
-├── CHANGELOG.md             # 변경사항 기록
-├── PROJECT_OVERVIEW.md      # 프로젝트 개요
 └── README.md               # 기본 문서
 ```
+
+---
+
+## 🔗 링크
+
+- **GitHub 저장소**: https://github.com/reima07/KT-kltecho-0827-hw
+- **개발자**: Jiwoo
+- **목적**: Kubernetes 학습 및 Azure CI/CD 구축
+
+---
+
+**이 프로젝트는 Kubernetes와 Azure 클라우드 기술을 학습하기 위한 실습 프로젝트입니다.**
