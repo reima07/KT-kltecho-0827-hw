@@ -40,17 +40,10 @@ def get_redis_connection():
     )
 
 # Kafka Producer 설정
-# SASL PLAIN 인증으로 연결
 def get_kafka_producer():
     return KafkaProducer(
         bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
         value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        # SASL 인증 설정
-        security_protocol='SASL_PLAINTEXT',
-        sasl_mechanism='PLAIN',
-        sasl_plain_username='admin',
-        sasl_plain_password='admin-secret',
-        # 토픽 자동 생성 설정
         acks='all',
         retries=3
     )
@@ -303,11 +296,6 @@ def get_kafka_logs():
             'api-logs',
             bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            # SASL 인증 설정
-            security_protocol='SASL_PLAINTEXT',
-            sasl_mechanism='PLAIN',
-            sasl_plain_username='admin',
-            sasl_plain_password='admin-secret',
             group_id='api-logs-viewer-' + str(int(time.time())),  # 고유한 그룹 ID
             auto_offset_reset='earliest',
             consumer_timeout_ms=3000,  # 3초로 증가
