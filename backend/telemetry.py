@@ -10,9 +10,10 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.http.log_exporter import OTLPLogExporter
-from opentelemetry.sdk.logs import LoggerProvider
-from opentelemetry.sdk.logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.mysql import MySQLInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
@@ -28,8 +29,16 @@ def setup_telemetry(app):
     # 서비스 이름 설정
     service_name = os.getenv('OTEL_SERVICE_NAME', 'jiwoo-backend')
     
+    # Resource 설정
+    resource = Resource.create({
+        "service.name": service_name,
+        "service.namespace": "jiwoo",
+        "deployment.environment": "production",
+        "cluster": "aks-145",
+    })
+    
     # Tracer Provider 설정
-    trace_provider = TracerProvider()
+    trace_provider = TracerProvider(resource=resource)
     trace_exporter = OTLPSpanExporter(endpoint=f"{collector_endpoint}/v1/traces")
     trace_provider.add_span_processor(BatchSpanProcessor(trace_exporter))
     trace.set_tracer_provider(trace_provider)
@@ -38,13 +47,24 @@ def setup_telemetry(app):
     metric_reader = PeriodicExportingMetricReader(
         OTLPMetricExporter(endpoint=f"{collector_endpoint}/v1/metrics")
     )
-    meter_provider = MeterProvider(metric_readers=[metric_reader])
+    meter_provider = MeterProvider(metric_readers=[metric_reader], resource=resource)
     metrics.set_meter_provider(meter_provider)
     
     # Logger Provider 설정 (로그 전송용)
-    log_exporter = OTLPLogExporter(endpoint=f"{collector_endpoint}/v1/logs")
-    log_provider = LoggerProvider()
+    log_exporter = OTLPLogExporter(
+        endpoint=os.getenv(
+            "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+            f"{collector_endpoint}/v1/logs"
+        )
+    )
+    log_provider = LoggerProvider(resource=resource)
     log_provider.add_log_record_processor(BatchLogRecordProcessor(log_exporter))
+    
+    # LoggingHandler 설정 (표준 logging → OTLP)
+    handler = LoggingHandler(level=logging.INFO, logger_provider=log_provider)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
     
     # Flask 자동 계측
     FlaskInstrumentor().instrument_app(app)

@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # 시간대 설정 (한국 표준시)
 ENV TZ=Asia/Seoul

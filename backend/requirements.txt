@@ -5,11 +5,16 @@ kafka-python
 mysql-connector-python
 werkzeug
 
-# OpenTelemetry dependencies (호환 버전으로 자동 해결)
+# OpenTelemetry core
 opentelemetry-api
 opentelemetry-sdk
-opentelemetry-instrumentation-flask
-opentelemetry-instrumentation-mysql
-opentelemetry-instrumentation-redis
+
+# OTLP Exporters (HTTP 사용)
 opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk-logs 
+
+# 자동 계측
+opentelemetry-instrumentation
+opentelemetry-instrumentation-flask
+opentelemetry-instrumentation-redis
+opentelemetry-instrumentation-mysql
+opentelemetry-instrumentation-logging 
