@@ -151,29 +151,30 @@ export default {
     }
   },
   mounted() {
-    // 페이지 뷰 추적
-    if (window.telemetry) {
-      window.telemetry.tracePageView('K8s Demo App', window.location.href);
-    }
+    // 페이지 뷰 추적 (간단한 콘솔 로깅)
+    console.log('Page view tracked: K8s Demo App', {
+      url: window.location.href,
+      timestamp: new Date().toISOString()
+    });
   },
   methods: {
-    // 사용자 행동 추적 메서드
+    // 사용자 행동 추적 메서드 (간단한 콘솔 로깅)
     trackUserAction(action, details = {}) {
-      if (window.telemetry) {
-        window.telemetry.traceUserAction(action, {
-          ...details,
-          timestamp: new Date().toISOString(),
-          user: this.currentUser || 'anonymous'
-        });
-      }
-      console.log(`User action tracked: ${action}`, details);
+      console.log(`User action tracked: ${action}`, {
+        ...details,
+        timestamp: new Date().toISOString(),
+        user: this.currentUser || 'anonymous'
+      });
     },
 
-    // API 호출 추적 메서드
+    // API 호출 추적 메서드 (간단한 콘솔 로깅)
     trackApiCall(url, method, responseTime, statusCode, error = null) {
-      if (window.telemetry) {
-        window.telemetry.traceApiCall(url, method, responseTime, statusCode, error);
-      }
+      console.log(`API call tracked: ${method} ${url}`, {
+        responseTime,
+        statusCode,
+        error: error ? error.message : null,
+        timestamp: new Date().toISOString()
+      });
     },
 
     // 날짜를 사용자 친화적인 형식으로 변환
