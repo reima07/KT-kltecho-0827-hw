@@ -161,11 +161,15 @@ def save_to_db():
         user_id = session['user_id']
         data = request.json
         
+        print(f"=== MANUAL TRACE DEBUG START ===")
+        print(f"DEBUG: About to start manual trace for POST /api/db/message")
+        
         # 수동 트레이스 시작
-        print(f"DEBUG: Starting manual trace for POST /api/db/message")
         tracer = trace.get_tracer(__name__)
+        print(f"DEBUG: Tracer created: {tracer}")
+        
         with tracer.start_as_current_span("save_message_to_db") as span:
-            print(f"DEBUG: Created save_message_to_db span")
+            print(f"DEBUG: Created save_message_to_db span: {span}")
             span.set_attribute("user.id", user_id)
             span.set_attribute("message.length", len(data.get('message', '')))
             span.set_attribute("message.preview", data.get('message', '')[:30])
@@ -177,7 +181,7 @@ def save_to_db():
             
             # DB 연결 트레이스
             with tracer.start_as_current_span("database_connection") as db_span:
-                print(f"DEBUG: Created database_connection span")
+                print(f"DEBUG: Created database_connection span: {db_span}")
                 db_span.set_attribute("db.system", "mysql")
                 db_span.set_attribute("db.name", "jiwoo_db")
                 db = get_db_connection()
@@ -186,7 +190,7 @@ def save_to_db():
             
             # SQL 실행 트레이스
             with tracer.start_as_current_span("sql_execution") as sql_span:
-                print(f"DEBUG: Created sql_execution span")
+                print(f"DEBUG: Created sql_execution span: {sql_span}")
                 sql_span.set_attribute("db.statement", "INSERT INTO messages")
                 sql_span.set_attribute("db.operation", "INSERT")
                 # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
@@ -203,9 +207,11 @@ def save_to_db():
             
             # Redis 로깅 트레이스
             with tracer.start_as_current_span("redis_logging") as redis_span:
+                print(f"DEBUG: Created redis_logging span: {redis_span}")
                 redis_span.set_attribute("redis.operation", "log_to_redis")
                 log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
             
+            print(f"=== MANUAL TRACE DEBUG END ===")
             async_log_api_stats('/db/message', 'POST', 'success', user_id)
             return jsonify({"status": "success"})
     except Exception as e:
