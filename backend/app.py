@@ -67,10 +67,6 @@ def log_to_redis(action, details):
 def async_log_api_stats(endpoint, method, status, user_id):
     def _log():
         try:
-            print(f"Creating Kafka producer for {endpoint}...")
-            producer = get_kafka_producer()
-            print(f"Kafka producer created successfully")
-            
             log_data = {
                 'timestamp': datetime.now().isoformat(),
                 'endpoint': endpoint,
@@ -79,15 +75,35 @@ def async_log_api_stats(endpoint, method, status, user_id):
                 'user_id': user_id,
                 'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
             }
-            print(f"Sending message to Kafka: {log_data}")
-            producer.send('api-logs', log_data)
-            producer.flush()
-            print(f"Message sent to Kafka successfully")
+            
+            # Redis에 카프카 로그 저장 (주요 로그 저장소)
+            try:
+                redis_client = get_redis_connection()
+                redis_client.lpush('kafka_logs', json.dumps(log_data))
+                redis_client.ltrim('kafka_logs', 0, 99)  # 최근 100개 로그만 유지
+                redis_client.close()
+                print(f"Kafka log saved to Redis: {log_data}")
+            except Exception as redis_error:
+                print(f"Redis logging error: {str(redis_error)}")
+            
+            # 카프카에도 메시지 전송 (선택적)
+            try:
+                print(f"Creating Kafka producer for {endpoint}...")
+                producer = get_kafka_producer()
+                print(f"Kafka producer created successfully")
+                print(f"Sending message to Kafka: {log_data}")
+                producer.send('api-logs', log_data)
+                producer.flush()
+                print(f"Message sent to Kafka successfully")
+                producer.close()
+            except Exception as kafka_error:
+                print(f"Kafka logging error: {str(kafka_error)}")
+                print(f"Kafka server: {os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092')}")
+                print(f"Topic: api-logs")
+                print(f"Error details: {type(kafka_error).__name__}")
+                
         except Exception as e:
-            print(f"Kafka logging error: {str(e)}")
-            print(f"Kafka server: {os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092')}")
-            print(f"Topic: api-logs")
-            print(f"Error details: {type(e).__name__}")
+            print(f"Logging error: {str(e)}")
     
     # 새로운 스레드에서 로깅 실행
     Thread(target=_log).start()
@@ -287,50 +303,29 @@ def search_messages():
             async_log_api_stats('/db/messages/search', 'GET', 'error', session['user_id'])
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# Kafka 로그 조회 엔드포인트
+# Kafka 로그 조회 엔드포인트 (Redis에서 조회)
 @app.route('/logs/kafka', methods=['GET'])
 @login_required
 def get_kafka_logs():
     try:
-        consumer = KafkaConsumer(
-            'api-logs',
-            bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            group_id='api-logs-viewer-' + str(int(time.time())),  # 고유한 그룹 ID
-            auto_offset_reset='earliest',
-            consumer_timeout_ms=3000,  # 3초로 증가
-            enable_auto_commit=True,
-            auto_commit_interval_ms=1000
-        )
+        redis_client = get_redis_connection()
+        logs = redis_client.lrange('kafka_logs', 0, -1)
+        redis_client.close()
         
-        logs = []
-        try:
-            # 메시지를 한 번에 가져오기
-            messages = list(consumer)
-            print(f"Raw messages from Kafka: {len(messages)}")
-            
-            for message in messages:
-                try:
-                    logs.append({
-                        'timestamp': message.value['timestamp'],
-                        'action': f"{message.value['method']} {message.value['endpoint']}",
-                        'details': message.value['message']
-                    })
-                except Exception as msg_error:
-                    print(f"Message processing error: {str(msg_error)}")
-                    continue
-                    
-                if len(logs) >= 100:
-                    break
-        except Exception as consumer_error:
-            print(f"Consumer error: {str(consumer_error)}")
-        finally:
-            consumer.close()
+        # JSON 파싱 및 시간 역순 정렬
+        parsed_logs = []
+        for log in logs:
+            try:
+                log_data = json.loads(log)
+                parsed_logs.append(log_data)
+            except:
+                continue
         
         # 시간 역순으로 정렬
-        logs.sort(key=lambda x: x['timestamp'], reverse=True)
-        print(f"Kafka logs found: {len(logs)}")
-        return jsonify(logs)
+        parsed_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        print(f"Kafka logs found in Redis: {len(parsed_logs)}")
+        return jsonify(parsed_logs)
     except Exception as e:
         print(f"Kafka log retrieval error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
