@@ -12,7 +12,6 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExp
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.mysql import MySQLInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.kafka import KafkaInstrumentor
 
 def setup_telemetry(app):
     """
@@ -46,9 +45,6 @@ def setup_telemetry(app):
     
     # Redis 자동 계측
     RedisInstrumentor().instrument()
-    
-    # Kafka 자동 계측
-    KafkaInstrumentor().instrument()
     
     print(f"OpenTelemetry 설정 완료 - Collector: {collector_endpoint}")
     return trace.get_tracer(service_name), metrics.get_meter(service_name)
