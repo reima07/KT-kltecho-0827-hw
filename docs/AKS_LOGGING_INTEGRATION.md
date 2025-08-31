@@ -23,6 +23,20 @@
   - 자동 계측: Document Load, User Interaction, Fetch
   - 커스텀 추적 함수: API 호출, 사용자 액션, 페이지 뷰
 
+### [2025-08-31] - 4단계: Collector 연동 테스트 🔄
+- [x] **버전 호환성 수정**
+  - 백엔드: Python 3.8 호환 OpenTelemetry 라이브러리 버전으로 수정
+    - `opentelemetry-api==1.20.0`, `opentelemetry-sdk==1.20.0`
+    - `opentelemetry-instrumentation-*==0.42b0`
+    - Kafka instrumentation 제거 (수동 추적으로 대체)
+  - 프론트엔드: Vue.js 2.6 호환 OpenTelemetry 라이브러리 버전으로 수정
+    - `@opentelemetry/api==1.4.1`, `@opentelemetry/sdk-web==0.33.0`
+    - `@opentelemetry/instrumentation-*==0.33.0`
+
+- [ ] **새로운 이미지 빌드 및 배포**
+- [ ] **Collector 연결 테스트**
+- [ ] **로그 및 트레이스 데이터 확인**
+
 ### [2025-08-31] - 3단계: 프론트엔드 로깅 코드 구현 ✅
 - [x] **OpenTelemetry 초기화**
   - `frontend/src/main.js`에 OpenTelemetry 초기화 추가
