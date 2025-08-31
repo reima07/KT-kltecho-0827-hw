@@ -9,7 +9,7 @@ import { DocumentLoadInstrumentation } from '@opentelemetry/instrumentation-docu
 import { UserInteractionInstrumentation } from '@opentelemetry/instrumentation-user-interaction';
 import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch';
 import { Resource } from '@opentelemetry/resources';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 
 // Collector 엔드포인트 설정
 const COLLECTOR_ENDPOINT = process.env.VUE_APP_OTEL_EXPORTER_OTLP_ENDPOINT || 
@@ -125,10 +125,10 @@ export function traceApiCall(url, method, responseTime, statusCode, error = null
     });
     
     if (error) {
-        span.setStatus({ code: trace.SpanStatusCode.ERROR, message: error.message });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
         span.recordException(error);
     } else {
-        span.setStatus({ code: trace.SpanStatusCode.OK });
+        span.setStatus({ code: SpanStatusCode.OK });
     }
     
     span.end();
