@@ -162,8 +162,10 @@ def save_to_db():
         data = request.json
         
         # 수동 트레이스 시작
+        print(f"DEBUG: Starting manual trace for POST /api/db/message")
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("save_message_to_db") as span:
+            print(f"DEBUG: Created save_message_to_db span")
             span.set_attribute("user.id", user_id)
             span.set_attribute("message.length", len(data.get('message', '')))
             span.set_attribute("message.preview", data.get('message', '')[:30])
@@ -175,6 +177,7 @@ def save_to_db():
             
             # DB 연결 트레이스
             with tracer.start_as_current_span("database_connection") as db_span:
+                print(f"DEBUG: Created database_connection span")
                 db_span.set_attribute("db.system", "mysql")
                 db_span.set_attribute("db.name", "jiwoo_db")
                 db = get_db_connection()
@@ -183,6 +186,7 @@ def save_to_db():
             
             # SQL 실행 트레이스
             with tracer.start_as_current_span("sql_execution") as sql_span:
+                print(f"DEBUG: Created sql_execution span")
                 sql_span.set_attribute("db.statement", "INSERT INTO messages")
                 sql_span.set_attribute("db.operation", "INSERT")
                 # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
