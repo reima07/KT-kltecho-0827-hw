@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, g
 from flask_cors import CORS
 import redis
 import mysql.connector
@@ -6,14 +6,59 @@ import json
 from datetime import datetime
 import os
 import time
+import uuid
 from kafka import KafkaProducer, KafkaConsumer
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from threading import Thread
 
+# OpenTelemetry 및 로깅 설정 import
+from telemetry import setup_telemetry
+from logging_config import setup_logging, log_info, log_error, log_warning, log_debug
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True)  # 세션을 위한 credentials 지원
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')  # 세션을 위한 시크릿 키
+
+# OpenTelemetry 및 로깅 초기화
+tracer, meter = setup_telemetry(app)
+setup_logging()
+
+# 요청 ID 생성 및 로깅을 위한 미들웨어
+@app.before_request
+def before_request():
+    # 요청 ID 생성
+    g.request_id = str(uuid.uuid4())
+    
+    # 사용자 정보 설정
+    if 'user_id' in session:
+        g.user_id = session['user_id']
+    
+    # 요청 시작 로깅
+    log_info("Request started", 
+             request_id=g.request_id,
+             method=request.method,
+             path=request.path,
+             remote_addr=request.remote_addr,
+             user_agent=request.headers.get('User-Agent', ''))
+
+@app.after_request
+def after_request(response):
+    # 요청 완료 로깅
+    log_info("Request completed",
+             request_id=g.request_id,
+             status_code=response.status_code,
+             response_size=len(response.get_data()))
+    return response
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # 예외 로깅
+    log_error("Unhandled exception",
+              request_id=getattr(g, 'request_id', 'unknown'),
+              exception=str(e),
+              exception_type=type(e).__name__)
+    return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 # # 스레드 풀 생성
 # thread_pool = ThreadPoolExecutor(max_workers=5)
@@ -48,7 +93,7 @@ def get_kafka_producer():
         retries=3
     )
 
-# 로깅 함수
+# Redis 로깅 함수 (기존 호환성 유지)
 def log_to_redis(action, details):
     try:
         redis_client = get_redis_connection()
@@ -60,8 +105,11 @@ def log_to_redis(action, details):
         redis_client.lpush('api_logs', json.dumps(log_entry))
         redis_client.ltrim('api_logs', 0, 99)  # 최근 100개 로그만 유지
         redis_client.close()
+        
+        # 구조화된 로깅으로도 기록
+        log_info("Redis log entry", action=action, details=details)
     except Exception as e:
-        print(f"Redis logging error: {str(e)}")
+        log_error("Redis logging error", error=str(e))
 
 # API 통계 로깅을 비동기로 처리하는 함수
 def async_log_api_stats(endpoint, method, status, user_id):
@@ -76,34 +124,44 @@ def async_log_api_stats(endpoint, method, status, user_id):
                 'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
             }
             
+            # 구조화된 로깅으로 기록
+            log_info("API call statistics",
+                     endpoint=endpoint,
+                     method=method,
+                     status=status,
+                     user_id=user_id,
+                     message=log_data['message'])
+            
             # Redis에 카프카 로그 저장 (주요 로그 저장소)
             try:
                 redis_client = get_redis_connection()
                 redis_client.lpush('kafka_logs', json.dumps(log_data))
                 redis_client.ltrim('kafka_logs', 0, 99)  # 최근 100개 로그만 유지
                 redis_client.close()
-                print(f"Kafka log saved to Redis: {log_data}")
+                log_debug("Kafka log saved to Redis", log_data=log_data)
             except Exception as redis_error:
-                print(f"Redis logging error: {str(redis_error)}")
+                log_error("Redis logging error", error=str(redis_error))
             
             # 카프카에도 메시지 전송 (선택적)
             try:
-                print(f"Creating Kafka producer for {endpoint}...")
+                log_debug("Creating Kafka producer", endpoint=endpoint)
                 producer = get_kafka_producer()
-                print(f"Kafka producer created successfully")
-                print(f"Sending message to Kafka: {log_data}")
+                log_debug("Kafka producer created successfully")
+                log_debug("Sending message to Kafka", log_data=log_data)
                 producer.send('api-logs', log_data)
                 producer.flush()
-                print(f"Message sent to Kafka successfully")
+                log_debug("Message sent to Kafka successfully")
                 producer.close()
             except Exception as kafka_error:
-                print(f"Kafka logging error: {str(kafka_error)}")
-                print(f"Kafka server: {os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092')}")
-                print(f"Topic: api-logs")
-                print(f"Error details: {type(kafka_error).__name__}")
+                log_error("Kafka logging error", 
+                         error=str(kafka_error),
+                         endpoint=endpoint,
+                         kafka_server=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
+                         topic='api-logs',
+                         error_type=type(kafka_error).__name__)
                 
         except Exception as e:
-            print(f"Logging error: {str(e)}")
+            log_error("Logging error", error=str(e))
     
     # 새로운 스레드에서 로깅 실행
     Thread(target=_log).start()
@@ -126,8 +184,14 @@ def login_required(f):
 def save_to_db():
     try:
         user_id = session['user_id']
-        db = get_db_connection()
         data = request.json
+        
+        log_info("Database message save started",
+                 user_id=user_id,
+                 message_length=len(data.get('message', '')),
+                 message_preview=data.get('message', '')[:30])
+        
+        db = get_db_connection()
         cursor = db.cursor()
         # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
         sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
@@ -136,12 +200,20 @@ def save_to_db():
         cursor.close()
         db.close()
         
+        log_info("Database message save completed",
+                 user_id=user_id,
+                 message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
+        
         # 로깅
         log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
         
         async_log_api_stats('/db/message', 'POST', 'success', user_id)
         return jsonify({"status": "success"})
     except Exception as e:
+        log_error("Database message save failed",
+                  user_id=user_id,
+                  error=str(e),
+                  error_type=type(e).__name__)
         async_log_api_stats('/db/message', 'POST', 'error', user_id)
         log_to_redis('db_insert_error', str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -219,7 +291,10 @@ def login():
         username = data.get('username')
         password = data.get('password')
         
+        log_info("Login attempt started", username=username)
+        
         if not username or not password:
+            log_warning("Login attempt failed - missing credentials", username=username)
             return jsonify({"status": "error", "message": "사용자명과 비밀번호는 필수입니다"}), 400
         
         db = get_db_connection()
@@ -232,6 +307,8 @@ def login():
         if user and check_password_hash(user['password'], password):
             session['user_id'] = username  # 세션에 사용자 정보 저장
             
+            log_info("User authentication successful", username=username)
+            
             # Redis 세션 저장 (선택적)
             try:
                 redis_client = get_redis_connection()
@@ -241,23 +318,31 @@ def login():
                 }
                 redis_client.set(f"session:{username}", json.dumps(session_data))
                 redis_client.expire(f"session:{username}", 3600)
+                log_debug("Redis session saved", username=username)
             except Exception as redis_error:
-                print(f"Redis session error: {str(redis_error)}")
+                log_warning("Redis session save failed", 
+                           username=username, 
+                           error=str(redis_error))
                 # Redis 오류는 무시하고 계속 진행
             
             # Kafka 로깅 추가
             async_log_api_stats('/login', 'POST', 'success', username)
             
+            log_info("Login completed successfully", username=username)
             return jsonify({
                 "status": "success", 
                 "message": "로그인 성공",
                 "username": username
             })
         
+        log_warning("Login attempt failed - invalid credentials", username=username)
         return jsonify({"status": "error", "message": "잘못된 인증 정보"}), 401
         
     except Exception as e:
-        print(f"Login error: {str(e)}")  # 서버 로그에 에러 출력
+        log_error("Login error", 
+                  username=username if 'username' in locals() else 'unknown',
+                  error=str(e),
+                  error_type=type(e).__name__)
         return jsonify({"status": "error", "message": "로그인 처리 중 오류가 발생했습니다"}), 500
 
 # 로그아웃 엔드포인트

@@ -8,32 +8,32 @@
         <h2>로그인</h2>
         <input v-model="username" placeholder="사용자명">
         <input v-model="password" type="password" placeholder="비밀번호">
-        <button @click="login">로그인</button>
-        <button @click="showRegister = true" class="register-btn">회원가입</button>
+        <button @click="login" @click.native="trackUserAction('login_button_click')">로그인</button>
+        <button @click="showRegister = true" @click.native="trackUserAction('register_button_click')" class="register-btn">회원가입</button>
       </div>
       <div v-else>
         <h2>회원가입</h2>
         <input v-model="registerUsername" placeholder="사용자명">
         <input v-model="registerPassword" type="password" placeholder="비밀번호">
         <input v-model="confirmPassword" type="password" placeholder="비밀번호 확인">
-        <button @click="register">가입하기</button>
-        <button @click="showRegister = false">로그인으로 돌아가기</button>
+        <button @click="register" @click.native="trackUserAction('register_submit')">가입하기</button>
+        <button @click="showRegister = false" @click.native="trackUserAction('back_to_login')">로그인으로 돌아가기</button>
       </div>
     </div>
 
     <div v-else>
       <div class="user-info">
         <span>안녕하세요, {{ username }}님</span>
-        <button @click="logout">로그아웃</button>
+        <button @click="logout" @click.native="trackUserAction('logout_button_click')">로그아웃</button>
       </div>
 
       <div class="container">
         <div class="section">
           <h2>MariaDB 메시지 관리</h2>
           <input v-model="dbMessage" placeholder="저장할 메시지 입력">
-          <button @click="saveToDb">DB에 저장</button>
-          <button @click="getFromDb">DB에서 조회</button>
-          <button @click="insertSampleData" class="sample-btn">샘플 데이터 저장</button>
+          <button @click="saveToDb" @click.native="trackUserAction('save_to_db_button_click')">DB에 저장</button>
+          <button @click="getFromDb" @click.native="trackUserAction('get_from_db_button_click')">DB에서 조회</button>
+          <button @click="insertSampleData" @click.native="trackUserAction('insert_sample_data_button_click')" class="sample-btn">샘플 데이터 저장</button>
           <div v-if="loading" class="loading-spinner">
             <p>데이터를 불러오는 중...</p>
           </div>
@@ -50,7 +50,7 @@
 
         <div class="section">
           <h2>Redis 로그</h2>
-          <button @click="getRedisLogs">Redis 로그 조회 (최근 10개)</button>
+          <button @click="getRedisLogs" @click.native="trackUserAction('get_redis_logs_button_click')">Redis 로그 조회 (최근 10개)</button>
           <div v-if="redisLogs.length">
             <h3>API 호출 로그 (최근 10개):</h3>
             <ul>
@@ -66,7 +66,7 @@
 
         <div class="section">
           <h2>Kafka 로그</h2>
-          <button @click="getKafkaLogs">Kafka 로그 조회 (최근 10개)</button>
+          <button @click="getKafkaLogs" @click.native="trackUserAction('get_kafka_logs_button_click')">Kafka 로그 조회 (최근 10개)</button>
           <div v-if="kafkaLogs.length">
             <h3>API 통계 로그 (최근 10개):</h3>
             <ul>
@@ -84,8 +84,8 @@
           <h2>메시지 검색</h2>
           <div class="search-section">
             <input v-model="searchQuery" placeholder="메시지 검색">
-            <button @click="searchMessages">검색</button>
-            <button @click="getAllMessages" class="view-all-btn">전체 메시지 보기</button>
+            <button @click="searchMessages" @click.native="trackUserAction('search_messages_button_click')">검색</button>
+            <button @click="getAllMessages" @click.native="trackUserAction('get_all_messages_button_click')" class="view-all-btn">전체 메시지 보기</button>
           </div>
           <div v-if="searchResults.length > 0" class="search-results">
             <h3>검색 결과:</h3>
@@ -150,7 +150,32 @@ export default {
       searchResults: []
     }
   },
+  mounted() {
+    // 페이지 뷰 추적
+    if (window.telemetry) {
+      window.telemetry.tracePageView('K8s Demo App', window.location.href);
+    }
+  },
   methods: {
+    // 사용자 행동 추적 메서드
+    trackUserAction(action, details = {}) {
+      if (window.telemetry) {
+        window.telemetry.traceUserAction(action, {
+          ...details,
+          timestamp: new Date().toISOString(),
+          user: this.currentUser || 'anonymous'
+        });
+      }
+      console.log(`User action tracked: ${action}`, details);
+    },
+
+    // API 호출 추적 메서드
+    trackApiCall(url, method, responseTime, statusCode, error = null) {
+      if (window.telemetry) {
+        window.telemetry.traceApiCall(url, method, responseTime, statusCode, error);
+      }
+    },
+
     // 날짜를 사용자 친화적인 형식으로 변환
     formatDate(dateString) {
       const date = new Date(dateString);
@@ -159,14 +184,19 @@ export default {
     
     // MariaDB에 메시지 저장
     async saveToDb() {
+      const startTime = Date.now();
       try {
-        await axios.post(`${API_BASE_URL}/db/message`, {
+        const response = await axios.post(`${API_BASE_URL}/db/message`, {
           message: this.dbMessage
         });
         this.dbMessage = '';
         this.getFromDb();
+        
+        // API 호출 추적
+        this.trackApiCall(`${API_BASE_URL}/db/message`, 'POST', Date.now() - startTime, response.status);
       } catch (error) {
         console.error('DB 저장 실패:', error);
+        this.trackApiCall(`${API_BASE_URL}/db/message`, 'POST', Date.now() - startTime, error.response?.status || 0, error);
       }
     },
 
@@ -219,6 +249,7 @@ export default {
 
     // 사용자 로그인 처리
     async login() {
+      const startTime = Date.now();
       try {
         const response = await axios.post(`${API_BASE_URL}/login`, {
           username: this.username,
@@ -230,11 +261,16 @@ export default {
           this.currentUser = this.username;
           this.username = '';
           this.password = '';
+          
+          // API 호출 추적
+          this.trackApiCall(`${API_BASE_URL}/login`, 'POST', Date.now() - startTime, response.status);
         } else {
           alert(response.data.message || '로그인에 실패했습니다.');
+          this.trackApiCall(`${API_BASE_URL}/login`, 'POST', Date.now() - startTime, 400, new Error(response.data.message));
         }
       } catch (error) {
         console.error('로그인 실패:', error);
+        this.trackApiCall(`${API_BASE_URL}/login`, 'POST', Date.now() - startTime, error.response?.status || 0, error);
         alert(error.response && error.response.data 
           ? error.response.data.message 
           : '로그인에 실패했습니다.');
