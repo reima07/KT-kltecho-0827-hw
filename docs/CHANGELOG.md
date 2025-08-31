@@ -378,6 +378,51 @@ spec:
 
 ### 8. Azure CI/CD 파이프라인 구축
 
+### 2024-08-28 - 최신 업데이트 및 Kafka 로그 문제 해결
+
+#### 프론트엔드 UI 개선
+- **`frontend/src/App.vue`** 업데이트
+  - Redis 로그: 자동 업데이트 → 버튼 클릭 시 조회
+  - Kafka 로그 섹션 추가
+  - 로그 표시: 최근 10개만 표시
+  - 로그 개수 안내 메시지 추가
+
+#### 백엔드 Kafka 로깅 강화
+- **`backend/app.py`** 업데이트
+  - Kafka Producer/Consumer SASL 인증 설정
+  - 로그인/로그아웃 API에 Kafka 로깅 추가
+  - 상세한 디버그 로그 추가
+  - Consumer 설정 최적화 (고유 group_id, 타임아웃, auto-commit)
+  - Kafka 서버 주소: `jiwoo-kafka:9092` 사용
+
+#### Kafka 설정 개선
+- **`k8s/kafka-values.yaml`** 업데이트
+  - SASL PLAIN 인증 설정 추가
+  - 토픽 자동 생성 활성화
+  - 리소스 최적화 (CPU 100m, Memory 100Mi)
+
+#### 리소스 최적화 (최신)
+- **MariaDB**: CPU 500m → 100m, Memory 512Mi → 50Mi
+- **Redis**: CPU 250m → 50m, Memory 256Mi → 50Mi
+- **Kafka**: CPU 500m → 100m, Memory 512Mi → 100Mi
+
+#### 해결된 문제들
+1. **ImagePullBackOff / 401 Unauthorized**: ACR 인증 설정으로 해결
+2. **GitHub Push Protection**: base64 인코딩으로 해결
+3. **프론트엔드 외부 접속 불가**: LoadBalancer 서비스 타입으로 해결
+4. **리소스 부족 오류**: CPU/메모리 요청 최적화로 해결
+
+#### 진행 중인 문제
+- **Kafka 로그 표시 문제**: 백엔드에서 메시지 전송은 성공하지만 프론트엔드에서 로그 조회 시 빈 응답
+- **진행 상황**: 
+  - SASL 인증 설정 완료
+  - Consumer 설정 최적화 완료
+  - 디버그 로그 추가 완료
+  - 백엔드 재배포 완료
+- **다음 단계**: 백엔드 로그 분석을 통한 정확한 원인 파악
+
+### 8. Azure CI/CD 파이프라인 구축
+
 #### GitHub Actions 워크플로우 생성
 - **파일**: `.github/workflows/build-and-push.yml`
   - Docker 이미지 빌드 및 ACR 푸시 자동화

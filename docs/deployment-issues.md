@@ -1,283 +1,274 @@
 # 배포 문제 해결 가이드
 
-## 개요
-이 문서는 Kubernetes 배포 과정에서 발생할 수 있는 문제들과 해결 방법을 정리합니다.
-
-## 🔥 최신 문제 해결 (2024-08-28)
+## 🔧 해결된 문제들
 
 ### 1. ImagePullBackOff / 401 Unauthorized 오류
 
 #### 문제 상황
 ```
-Events: Type Reason Age From Message
-Normal Scheduled 104s default-scheduler Successfully assigned jiwoo/jiwoo-backend-688d545856-p2hw6 to aks-agentpool-33969586-vmss000001
-Normal BackOff 24s (x5 over 103s) kubelet Back-off pulling image "ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend"
-Warning Failed 24s (x5 over 103s) kubelet Error: ImagePullBackOff
-Normal Pulling 9s (x4 over 104s) kubelet Pulling image "ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend"
-Warning Failed 9s (x4 over 104s) kubelet Failed to pull image "ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend": failed to pull and unpack image "ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend:latest": failed to resolve reference "ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend:latest": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ktech4.azurecr.io/oauth2/token?scope=repository%3Akltecho_jiwoo_20250828_032716-backend%3Apull&service=ktech4.azurecr.io: 401 Unauthorized
-Error: ErrImagePull
+Failed to pull image "ktech4.azurecr.io/kltecho_jiwoo-backend:latest": 
+failed to resolve reference "ktech4.azurecr.io/kltecho_jiwoo-backend:latest": 
+failed to authorize: failed to fetch anonymous token: 
+unexpected status from GET request to https://ktech4.azurecr.io/oauth2/token: 401 Unauthorized
 ```
 
-#### 원인 분석
-1. **ACR 인증 문제**: Kubernetes 클러스터가 ACR에서 이미지를 가져올 때 인증 실패
-2. **이미지 이름 불일치**: GitHub Actions와 배포 파일의 이미지 이름이 다름
-3. **GitHub Actions vs Kubernetes 인증 차이**: 
-   - GitHub Actions: ACR에 이미지 푸시용 인증
-   - Kubernetes: ACR에서 이미지 풀링용 인증
+#### 원인
+- Kubernetes 클러스터에서 Azure Container Registry (ACR) 인증 정보 누락
+- `imagePullSecrets` 설정 없음
 
 #### 해결 방법
-
-##### 1단계: ACR 시크릿 생성
+1. **ACR Secret 생성** (`k8s/jiwoo-acr-secret.yaml`)
 ```yaml
-# k8s/jiwoo-acr-secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: acr-secret
 type: kubernetes.io/dockerconfigjson
-stringData:
-  .dockerconfigjson: |
-    {
-      "auths": {
-        "ktech4.azurecr.io": {
-          "username": "ktech4",
-          "password": "YOUR_ACR_PASSWORD"
-        }
-      }
-    }
+data:
+  .dockerconfigjson: <base64-encoded-docker-config>
 ```
 
-##### 2단계: 배포 파일에 imagePullSecrets 추가
+2. **배포 파일에 `imagePullSecrets` 추가**
 ```yaml
-# k8s/jiwoo-backend-deployment.yaml
 spec:
-  template:
-    spec:
-      imagePullSecrets:
-      - name: acr-secret
-      containers:
-      - name: backend
-        image: ktech4.azurecr.io/kltecho_jiwoo-backend:latest
+  imagePullSecrets:
+  - name: acr-secret
+  containers:
+  - name: backend
+    image: ktech4.azurecr.io/kltecho_jiwoo-backend:latest
 ```
 
-##### 3단계: 이미지 이름 통일
-- **GitHub Actions**: `kltecho_jiwoo-backend:latest`
-- **배포 파일**: `kltecho_jiwoo-backend:latest`
-
-##### 4단계: 배포 스크립트에 ACR 시크릿 적용 추가
+3. **Secret 적용**
 ```bash
-# deploy-to-jiwoo-namespace.sh
-echo "   - Secret 적용 중..."
-kubectl apply -f k8s/jiwoo-backend-secret.yaml -n jiwoo -v=1
-kubectl apply -f k8s/jiwoo-acr-secret.yaml -n jiwoo -v=1  # 추가
-echo "   ✅ Secret 적용 완료"
+kubectl apply -f k8s/jiwoo-acr-secret.yaml -n jiwoo
 ```
 
-#### 검증 방법
+### 2. GitHub Push Protection 차단
+
+#### 문제 상황
+- GitHub에서 평문 비밀번호가 포함된 파일 푸시 시 차단
+- 보안 정책 위반으로 인한 푸시 실패
+
+#### 해결 방법
+1. **base64 인코딩 사용**
 ```bash
-# ACR 시크릿 확인
-kubectl get secrets -n jiwoo
-
-# Pod 상태 확인
-kubectl get pods -n jiwoo
-
-# Pod 상세 정보 확인
-kubectl describe pod <pod-name> -n jiwoo
+echo -n '{"auths":{"ktech4.azurecr.io":{"username":"ktech4","password":"<password>"}}}' | base64
 ```
 
-## 🚨 이전 문제들과 해결 방법
+2. **Git 히스토리 리셋**
+```bash
+git reset --soft HEAD~2
+git add .
+git commit -m "Update with encoded secrets"
+git push origin main
+```
 
-### 1. MariaDB 스케줄링 실패
+### 3. 프론트엔드 외부 접속 불가
+
+#### 문제 상황
+- Azure AKS에서 NodePort 서비스로는 외부 접속 불가
+- `localhost:30080` 접속 시도 실패
+
+#### 해결 방법
+1. **서비스 타입을 LoadBalancer로 변경**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: jiwoo-frontend-service
+spec:
+  type: LoadBalancer  # NodePort → LoadBalancer
+  selector:
+    app: jiwoo-frontend
+  ports:
+  - port: 80
+    targetPort: 80
+```
+
+2. **LoadBalancer IP 확인**
+```bash
+kubectl get service jiwoo-frontend-service -n jiwoo
+```
+
+### 4. 리소스 부족 오류
 
 #### 문제 상황
 ```
-Warning FailedScheduling ... Insufficient cpu
+0/8 nodes are available: 8 Insufficient cpu.
 ```
 
-#### 원인 분석
-- **CPU 요구량**: MariaDB 기본값 500m이 너무 높음
-- **클러스터 상황**: 다른 사용자들의 서비스들이 많은 CPU 사용
-- **노드 부족**: 사용 가능한 CPU가 부족한 상황
-
 #### 해결 방법
+1. **MariaDB 리소스 최적화** (`k8s/mariadb-values.yaml`)
 ```yaml
-# k8s/mariadb-values.yaml
 primary:
   resources:
     requests:
-      cpu: 250m        # 500m에서 50% 감소
-      memory: 512Mi    # 적절한 메모리 설정
+      cpu: 100m        # 500m → 100m
+      memory: 50Mi     # 512Mi → 50Mi
 ```
 
-### 2. Kafka 설치 타임아웃
-
-#### 문제 상황
-```
-INSTALLATION FAILED: context deadline exceeded
-```
-
-#### 원인 분석
-- **Helm 타임아웃**: 기본 300초가 부족
-- **리소스 부족**: Kafka가 요구하는 리소스가 많음
-- **네트워크 지연**: 이미지 다운로드 시간
-
-#### 해결 방법
-```bash
-# deploy-to-jiwoo-namespace.sh에서 타임아웃 증가
-helm install jiwoo-kafka bitnami/kafka \
-  --values k8s/kafka-values.yaml \
-  --namespace jiwoo \
-  --wait \
-  --timeout 600s \    # 300s에서 600s로 증가
-  --debug
-```
-
-### 3. 네임스페이스 불일치 오류
-
-#### 문제 상황
-```
-error: the namespace from the provided object "default" does not match the namespace "jiwoo"
-```
-
-#### 원인 분석
-- **YAML 파일**: `namespace: default`로 하드코딩
-- **배포 스크립트**: `-n jiwoo`로 네임스페이스 지정
-
-#### 해결 방법
+2. **Redis 리소스 최적화** (`k8s/redis-values.yaml`)
 ```yaml
-# 모든 k8s/*.yaml 파일에서
-# namespace: default  # 주석 처리
+resources:
+  requests:
+    cpu: 50m          # 250m → 50m
+    memory: 50Mi      # 256Mi → 50Mi
 ```
 
-### 4. 이미지 풀 오류
-
-#### 문제 상황
-```
-Failed to pull image "ktech4.azurecr.io/kltecho_jiwoo-backend:latest": 401 Unauthorized
-```
-
-#### 원인 분석
-- **이미지 태그 불일치**: GitHub Actions는 날짜시간 태그, YAML은 latest 태그
-- **인증 문제**: ACR 접근 권한
-
-#### 해결 방법
+3. **Kafka 리소스 최적화** (`k8s/kafka-values.yaml`)
 ```yaml
-# k8s/jiwoo-backend-deployment.yaml
-spec:
-  containers:
-  - name: backend
-    image: ktech4.azurecr.io/kltecho_jiwoo_20250828_032716-backend  # 구체적인 태그 사용
+controller:
+  resources:
+    requests:
+      cpu: 100m       # 500m → 100m
+      memory: 100Mi   # 512Mi → 100Mi
 ```
 
-### 5. 시크릿 누락 오류
+### 5. Kafka 로그 표시 문제 (진행 중)
 
 #### 문제 상황
-```
-Error from server (NotFound): secrets "jiwoo-backend-secrets" not found
+- 백엔드에서 Kafka 메시지 전송은 성공
+- 프론트엔드에서 로그 조회 시 빈 응답
+- Kafka Consumer가 메시지를 읽지 못함
+
+#### 해결 시도
+1. **SASL 인증 설정**
+```python
+def get_kafka_producer():
+    return KafkaProducer(
+        bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
+        security_protocol='SASL_PLAINTEXT',
+        sasl_mechanism='PLAIN',
+        sasl_plain_username='admin',
+        sasl_plain_password='admin-secret',
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    )
 ```
 
-#### 원인 분석
-- **기존 시크릿**: default 네임스페이스에 존재
-- **새 네임스페이스**: jiwoo 네임스페이스에 시크릿 없음
+2. **Consumer 설정 최적화**
+```python
+consumer = KafkaConsumer(
+    'api-logs',
+    bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
+    security_protocol='SASL_PLAINTEXT',
+    sasl_mechanism='PLAIN',
+    sasl_plain_username='admin',
+    sasl_plain_password='admin-secret',
+    group_id='api-logs-viewer-' + str(int(time.time())),
+    auto_offset_reset='earliest',
+    consumer_timeout_ms=3000,
+    enable_auto_commit=True,
+    auto_commit_interval_ms=1000
+)
+```
 
-#### 해결 방법
+3. **Kafka Helm 설정 업데이트**
+```yaml
+auth:
+  enabled: false
+controller:
+  extraEnvVars:
+    - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+      value: "true"
+    - name: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+      value: "PLAIN"
+    - name: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+      value: "PLAIN"
+    - name: KAFKA_CFG_SASL_JAAS_CONFIG
+      value: "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"admin\" password=\"admin-secret\";"
+```
+
+#### 현재 상태
+- 디버그 로그 추가 완료
+- 백엔드 재배포 완료
+- 정확한 원인 파악을 위한 로그 분석 필요
+
+## 🛠️ 디버깅 명령어
+
+### Pod 상태 확인
 ```bash
-# cleanup-jiwoo-namespace.sh에서 기존 시크릿 삭제
-kubectl delete secret backend-secrets -n default --ignore-not-found=true
-kubectl delete secret jiwoo-backend-secrets -n default --ignore-not-found=true
+# Pod 상태 확인
+kubectl get pods -n jiwoo
+
+# Pod 상세 정보
+kubectl describe pod <pod-name> -n jiwoo
+
+# Pod 로그 확인
+kubectl logs <pod-name> -n jiwoo --tail=50
 ```
 
-## 🔧 배포 스크립트 개선사항
-
-### 1. 상세 로깅 추가
+### 서비스 상태 확인
 ```bash
-# --debug 플래그 추가
-helm install jiwoo-mariadb bitnami/mariadb \
-  --values k8s/mariadb-values.yaml \
-  --namespace jiwoo \
-  --wait \
-  --timeout 300s \
-  --debug
+# 서비스 상태 확인
+kubectl get services -n jiwoo
 
-# -v=1 플래그 추가
-kubectl apply -f k8s/jiwoo-backend-secret.yaml -n jiwoo -v=1
+# 서비스 상세 정보
+kubectl describe service <service-name> -n jiwoo
 ```
 
-### 2. 타임아웃 조정
+### 배포 상태 확인
 ```bash
-# 600s → 300s로 조정 (사용자 요청)
---timeout 300s
+# 배포 상태 확인
+kubectl get deployments -n jiwoo
+
+# 배포 상세 정보
+kubectl describe deployment <deployment-name> -n jiwoo
+
+# 배포 롤아웃 상태
+kubectl rollout status deployment/<deployment-name> -n jiwoo
 ```
 
-### 3. 네임스페이스 관리
-```bash
-# 네임스페이스 생성 확인
-kubectl create namespace jiwoo --dry-run=client -o yaml | kubectl apply -f - -v=1
-```
-
-## 📊 리소스 모니터링
-
-### 클러스터 현황 확인
+### 리소스 사용량 확인
 ```bash
 # 노드별 리소스 사용량
 kubectl top nodes
 
-# 네임스페이스별 CPU 요구량
-kubectl get pods --all-namespaces -o custom-columns="NAMESPACE:.metadata.namespace,CPU-REQ:.spec.containers[*].resources.requests.cpu" | grep -v "<none>" | awk '{print $1, $2}' | awk '{split($2,arr,","); for(i in arr) print $1, arr[i]}' | sort | awk '{sum[$1]+=$2} END {for(i in sum) print i, sum[i]"m"}' | sort -k2 -nr
+# Pod별 리소스 사용량
+kubectl top pods -n jiwoo
+
+# 네임스페이스별 리소스 요청
+kubectl describe nodes | grep -A 10 "Allocated resources"
 ```
 
-### 파드 상태 확인
+### Kafka 디버깅
 ```bash
-# 파드 상태 확인
-kubectl get pods -n jiwoo
+# Kafka 토픽 확인
+kubectl exec -it jiwoo-kafka-controller-0 -n jiwoo -- kafka-topics.sh --list --bootstrap-server localhost:9092
 
-# 파드 상세 정보
-kubectl describe pod <pod-name> -n jiwoo
-
-# 파드 로그 확인
-kubectl logs <pod-name> -n jiwoo
+# Kafka 메시지 확인
+kubectl exec -it jiwoo-kafka-controller-0 -n jiwoo -- kafka-console-consumer.sh --topic api-logs --from-beginning --bootstrap-server localhost:9092
 ```
 
-## 🎯 예방 방법
+## 📋 예방 방법
 
-### 1. 사전 리소스 확인
-```bash
-# 배포 전 클러스터 여유 리소스 확인
-kubectl top nodes
-kubectl get pods --all-namespaces | grep Pending
-```
+### 1. 배포 전 체크리스트
+- [ ] ACR Secret이 올바르게 설정되었는지 확인
+- [ ] 이미지 태그가 일치하는지 확인
+- [ ] 리소스 요청이 적절한지 확인
+- [ ] 네임스페이스가 올바른지 확인
 
-### 2. 점진적 배포
-```bash
-# 한 번에 하나씩 배포
-helm install jiwoo-redis bitnami/redis --values k8s/redis-values.yaml --namespace jiwoo --wait
-helm install jiwoo-mariadb bitnami/mariadb --values k8s/mariadb-values.yaml --namespace jiwoo --wait
-helm install jiwoo-kafka bitnami/kafka --values k8s/kafka-values.yaml --namespace jiwoo --wait
-```
+### 2. 모니터링 체크리스트
+- [ ] Pod 상태가 Running인지 확인
+- [ ] 서비스가 올바르게 생성되었는지 확인
+- [ ] 로그에 오류가 없는지 확인
+- [ ] 리소스 사용량이 적절한지 확인
 
-### 3. 롤백 준비
-```bash
-# 배포 실패 시 롤백
-helm rollback jiwoo-mariadb -n jiwoo
-kubectl delete namespace jiwoo --ignore-not-found=true
-```
+### 3. 문제 발생 시 대응 순서
+1. **즉시 확인**: `kubectl get pods -n jiwoo`
+2. **상세 분석**: `kubectl describe pod <pod-name> -n jiwoo`
+3. **로그 확인**: `kubectl logs <pod-name> -n jiwoo`
+4. **리소스 확인**: `kubectl top nodes`
+5. **재배포**: `kubectl rollout restart deployment/<deployment-name> -n jiwoo`
 
-## 📋 체크리스트
+## 🔄 최신 문제 해결 (2024-08-28)
 
-### 배포 전 확인사항
-- [ ] 클러스터 리소스 여유 확인
-- [ ] 이미지 태그 일치 확인
-- [ ] 네임스페이스 정리 완료
-- [ ] values 파일 리소스 설정 확인
+### Kafka 로그 표시 문제
+- **상태**: 진행 중
+- **마지막 업데이트**: 백엔드 재배포 완료, 디버그 로그 추가
+- **다음 단계**: 백엔드 로그 분석을 통한 정확한 원인 파악
 
-### 배포 중 확인사항
-- [ ] 파드 스케줄링 상태 확인
-- [ ] 이미지 풀 상태 확인
-- [ ] 서비스 시작 상태 확인
-- [ ] 로그 오류 확인
-
-### 배포 후 확인사항
-- [ ] 모든 파드 Running 상태 확인
-- [ ] 서비스 연결 확인
-- [ ] 애플리케이션 동작 확인
-- [ ] 리소스 사용량 모니터링
+### 해결된 문제들
+1. ✅ **ImagePullBackOff / 401 Unauthorized**: ACR 인증 설정으로 해결
+2. ✅ **GitHub Push Protection**: base64 인코딩으로 해결
+3. ✅ **프론트엔드 외부 접속 불가**: LoadBalancer 서비스 타입으로 해결
+4. ✅ **리소스 부족 오류**: CPU/메모리 요청 최적화로 해결

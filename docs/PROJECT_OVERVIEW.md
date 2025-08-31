@@ -102,16 +102,19 @@ CI/CD: GitHub Actions (예정)
 
 ### 🔄 진행 중인 작업
 
-#### 1. ACR 인증 문제 해결
-- [ ] **Kubernetes ACR 인증 설정** (imagePullSecrets)
-- [ ] **401 Unauthorized 오류 해결** (ACR 시크릿 생성)
-- [ ] **이미지 풀링 테스트** (배포 검증)
-- [x] **CI/CD 파이프라인 가이드** (CI_CD_PIPELINE.md)
+#### 1. Kafka 로그 표시 문제 해결
+- [x] **SASL 인증 설정** (Kafka Producer/Consumer)
+- [x] **Consumer 설정 최적화** (고유 group_id, 타임아웃, auto-commit)
+- [x] **디버그 로그 추가** (백엔드 Kafka 로깅)
+- [x] **백엔드 재배포** (최신 코드 적용)
+- [ ] **백엔드 로그 분석** (정확한 원인 파악)
 
-### 🔄 진행 중인 작업
-- [ ] **GitHub Actions Secrets 설정** (ACR 정보 3개)
-- [ ] **Azure Container Registry 생성**
-- [ ] **최적화된 설정으로 배포 테스트**
+#### 2. 최신 업데이트 완료
+- [x] **프론트엔드 UI 개선** (Redis/Kafka 로그 버튼 클릭 방식)
+- [x] **리소스 최적화** (CPU/메모리 요청 최적화)
+- [x] **ACR 인증 설정** (Kubernetes Secret)
+- [x] **LoadBalancer 서비스 타입** (프론트엔드 외부 접속)
+- [x] **GitHub Push Protection 해결** (base64 인코딩)
 
 ### 📋 예정된 작업
 
@@ -130,8 +133,9 @@ CI/CD: GitHub Actions (예정)
 ## 🛠️ 배포 정보
 
 ### 현재 접속 정보
-- **프론트엔드**: http://localhost:30080
-- **백엔드 API**: http://localhost:5000
+- **프론트엔드**: LoadBalancer IP (외부 접속)
+- **백엔드 API**: ClusterIP (내부 접속)
+- **확인 명령어**: `kubectl get service jiwoo-frontend-service -n jiwoo`
 
 ### 서비스 상태
 ```
@@ -185,19 +189,20 @@ CI/CD: GitHub Actions (예정)
 ## 🔧 주요 설정
 
 ### Helm Charts (Bitnami)
-- **Redis**: 비밀번호 `New1234!`, standalone 모드, CPU 100m, Memory 128Mi
-- **Kafka**: 3개 컨트롤러, SASL 인증 비활성화, CPU 200m, Memory 256Mi
-- **MariaDB**: 사용자 `jiwoo`, 비밀번호 `jiwoo1234!`, DB `jiwoo_db`, CPU 250m, Memory 512Mi
+- **Redis**: 비밀번호 `New1234!`, standalone 모드, CPU 50m, Memory 50Mi
+- **Kafka**: 3개 컨트롤러, SASL PLAIN 인증, CPU 100m, Memory 100Mi
+- **MariaDB**: 사용자 `jiwoo`, 비밀번호 `jiwoo1234!`, DB `jiwoo_db`, CPU 100m, Memory 50Mi
 
 ### Docker 이미지
-- **Backend**: `{ACR_LOGIN_SERVER}/kltecho_jiwoo_날짜시간-backend`
-- **Frontend**: `{ACR_LOGIN_SERVER}/kltecho_jiwoo_날짜시간-frontend`
-- **태그 형식**: 한국 시간(KST) 기반 YYYYMMDD_HHMMSS
+- **Backend**: `ktech4.azurecr.io/kltecho_jiwoo-backend:latest`
+- **Frontend**: `ktech4.azurecr.io/kltecho_jiwoo-frontend:latest`
+- **태그 형식**: `latest` + 한국 시간(KST) 기반 날짜시간 태그
 
 ### Kubernetes 리소스
 - **네임스페이스**: jiwoo (전용 네임스페이스)
 - **접두사**: jiwoo- (모든 리소스)
-- **서비스 타입**: ClusterIP (내부), NodePort (외부)
+- **서비스 타입**: ClusterIP (백엔드), LoadBalancer (프론트엔드)
+- **ACR 인증**: `imagePullSecrets` 설정 완료
 
 ## 🎓 학습 내용
 
