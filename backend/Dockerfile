@@ -1,5 +1,9 @@
 FROM python:3.8-slim
 
+# 시간대 설정 (한국 표준시)
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt

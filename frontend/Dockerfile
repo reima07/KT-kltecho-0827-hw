@@ -11,6 +11,13 @@ RUN npm run build
 
 # Production stage
 FROM nginx:alpine
+
+# 시간대 설정 (한국 표준시)
+ENV TZ=Asia/Seoul
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
+
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
