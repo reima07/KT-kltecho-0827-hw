@@ -80,6 +80,8 @@
           </div>
         </div>
 
+
+
         <div class="section">
           <h2>메시지 검색</h2>
           <div class="search-section">
@@ -515,4 +517,6 @@ li {
   margin-top: 10px;
   text-align: center;
 }
+
+
 </style> 

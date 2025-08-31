@@ -11,6 +11,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from threading import Thread
+from opentelemetry import trace
 
 # OpenTelemetry 및 로깅 설정 import
 from telemetry import setup_telemetry
@@ -160,30 +161,56 @@ def save_to_db():
         user_id = session['user_id']
         data = request.json
         
-        log_info("Database message save started",
-                 user_id=user_id,
-                 message_length=len(data.get('message', '')),
-                 message_preview=data.get('message', '')[:30])
-        
-        db = get_db_connection()
-        cursor = db.cursor()
-        # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
-        sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
-        cursor.execute(sql, (data['message'], user_id, datetime.now()))
-        db.commit()
-        cursor.close()
-        db.close()
-        
-        log_info("Database message save completed",
-                 user_id=user_id,
-                 message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
-        
-        # 로깅
-        log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
-        
-        async_log_api_stats('/db/message', 'POST', 'success', user_id)
-        return jsonify({"status": "success"})
+        # 수동 트레이스 시작
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("save_message_to_db") as span:
+            span.set_attribute("user.id", user_id)
+            span.set_attribute("message.length", len(data.get('message', '')))
+            span.set_attribute("message.preview", data.get('message', '')[:30])
+            
+            log_info("Database message save started",
+                     user_id=user_id,
+                     message_length=len(data.get('message', '')),
+                     message_preview=data.get('message', '')[:30])
+            
+            # DB 연결 트레이스
+            with tracer.start_as_current_span("database_connection") as db_span:
+                db_span.set_attribute("db.system", "mysql")
+                db_span.set_attribute("db.name", "jiwoo_db")
+                db = get_db_connection()
+            
+            cursor = db.cursor()
+            
+            # SQL 실행 트레이스
+            with tracer.start_as_current_span("sql_execution") as sql_span:
+                sql_span.set_attribute("db.statement", "INSERT INTO messages")
+                sql_span.set_attribute("db.operation", "INSERT")
+                # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
+                sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
+                cursor.execute(sql, (data['message'], user_id, datetime.now()))
+                db.commit()
+            
+            cursor.close()
+            db.close()
+            
+            log_info("Database message save completed",
+                     user_id=user_id,
+                     message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
+            
+            # Redis 로깅 트레이스
+            with tracer.start_as_current_span("redis_logging") as redis_span:
+                redis_span.set_attribute("redis.operation", "log_to_redis")
+                log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
+            
+            async_log_api_stats('/db/message', 'POST', 'success', user_id)
+            return jsonify({"status": "success"})
     except Exception as e:
+        # 에러 트레이스
+        current_span = trace.get_current_span()
+        if current_span:
+            current_span.record_exception(e)
+            current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+        
         log_error("Database message save failed",
                   user_id=user_id,
                   error=str(e),
@@ -197,18 +224,43 @@ def save_to_db():
 def get_from_db():
     try:
         user_id = session['user_id']
-        db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM messages ORDER BY created_at DESC")
-        messages = cursor.fetchall()
-        cursor.close()
-        db.close()
         
-        # 비동기 로깅으로 변경
-        async_log_api_stats('/db/messages', 'GET', 'success', user_id)
-        
-        return jsonify(messages)
+        # 수동 트레이스 시작
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("get_messages_from_db") as span:
+            span.set_attribute("user.id", user_id)
+            span.set_attribute("db.operation", "SELECT")
+            
+            # DB 연결 트레이스
+            with tracer.start_as_current_span("database_connection") as db_span:
+                db_span.set_attribute("db.system", "mysql")
+                db_span.set_attribute("db.name", "jiwoo_db")
+                db = get_db_connection()
+            
+            cursor = db.cursor(dictionary=True)
+            
+            # SQL 실행 트레이스
+            with tracer.start_as_current_span("sql_execution") as sql_span:
+                sql_span.set_attribute("db.statement", "SELECT * FROM messages ORDER BY created_at DESC")
+                sql_span.set_attribute("db.operation", "SELECT")
+                cursor.execute("SELECT * FROM messages ORDER BY created_at DESC")
+                messages = cursor.fetchall()
+                sql_span.set_attribute("db.result.count", len(messages))
+            
+            cursor.close()
+            db.close()
+            
+            # 비동기 로깅으로 변경
+            async_log_api_stats('/db/messages', 'GET', 'success', user_id)
+            
+            return jsonify(messages)
     except Exception as e:
+        # 에러 트레이스
+        current_span = trace.get_current_span()
+        if current_span:
+            current_span.record_exception(e)
+            current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+        
         if 'user_id' in session:
             async_log_api_stats('/db/messages', 'GET', 'error', session['user_id'])
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -389,6 +441,8 @@ def get_kafka_logs():
     except Exception as e:
         print(f"Kafka log retrieval error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 
