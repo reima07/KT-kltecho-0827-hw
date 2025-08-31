@@ -368,8 +368,8 @@ def search_messages():
 def get_kafka_logs():
     try:
         redis_client = get_redis_connection()
-        # 최신 로그 50개만 가져오기 (Redis 리스트의 오른쪽 끝에서부터)
-        logs = redis_client.lrange('kafka_logs', -50, -1)
+        # 최신 로그 10개만 가져오기 (Redis 리스트의 오른쪽 끝에서부터)
+        logs = redis_client.lrange('kafka_logs', -10, -1)
         redis_client.close()
         
         # JSON 파싱 및 시간 역순 정렬
