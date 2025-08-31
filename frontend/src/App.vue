@@ -196,7 +196,8 @@ export default {
         this.trackApiCall(`${API_BASE_URL}/db/message`, 'POST', Date.now() - startTime, response.status);
       } catch (error) {
         console.error('DB 저장 실패:', error);
-        this.trackApiCall(`${API_BASE_URL}/db/message`, 'POST', Date.now() - startTime, error.response?.status || 0, error);
+        const status = (error && error.response && error.response.status) ? error.response.status : 0;
+        this.trackApiCall(`${API_BASE_URL}/db/message`, 'POST', Date.now() - startTime, status, error);
       }
     },
 
@@ -270,7 +271,8 @@ export default {
         }
       } catch (error) {
         console.error('로그인 실패:', error);
-        this.trackApiCall(`${API_BASE_URL}/login`, 'POST', Date.now() - startTime, error.response?.status || 0, error);
+        const status = (error && error.response && error.response.status) ? error.response.status : 0;
+        this.trackApiCall(`${API_BASE_URL}/login`, 'POST', Date.now() - startTime, status, error);
         alert(error.response && error.response.data 
           ? error.response.data.message 
           : '로그인에 실패했습니다.');
