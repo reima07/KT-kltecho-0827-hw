@@ -148,8 +148,13 @@ def async_log_api_stats(endpoint, method, status, user_id):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        print(f"=== LOGIN_REQUIRED DEBUG ===")
+        print(f"DEBUG: Checking session: {session}")
+        print(f"DEBUG: user_id in session: {'user_id' in session}")
         if 'user_id' not in session:
+            print(f"DEBUG: Login required - user_id not in session")
             return jsonify({"status": "error", "message": "로그인이 필요합니다"}), 401
+        print(f"DEBUG: Login OK - proceeding to function")
         return f(*args, **kwargs)
     return decorated_function
 
