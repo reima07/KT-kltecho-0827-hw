@@ -21,8 +21,8 @@ CORS(app, supports_credentials=True)  # 세션을 위한 credentials 지원
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')  # 세션을 위한 시크릿 키
 
 # OpenTelemetry 및 로깅 초기화
-tracer, meter = setup_telemetry(app)
-setup_logging()
+setup_logging()  # 먼저 로깅 설정
+tracer, meter = setup_telemetry(app)  # 그 다음 OTel 설정 (핸들러 보존)
 
 # 요청 ID 생성 및 로깅을 위한 미들웨어
 @app.before_request
@@ -368,8 +368,8 @@ def search_messages():
 def get_kafka_logs():
     try:
         redis_client = get_redis_connection()
-        # 최신 로그 10개만 가져오기 (Redis 리스트의 오른쪽 끝에서부터)
-        logs = redis_client.lrange('kafka_logs', -10, -1)
+        # 최신 로그 10개만 가져오기 (Redis 리스트의 왼쪽 끝에서부터)
+        logs = redis_client.lrange('kafka_logs', 0, 9)
         redis_client.close()
         
         # JSON 파싱 및 시간 역순 정렬

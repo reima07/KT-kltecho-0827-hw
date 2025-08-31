@@ -69,8 +69,13 @@ def setup_logging():
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level))
     
-    # 기존 핸들러 제거
+    # 기존 핸들러 제거 (OTel 핸들러는 보존)
+    from opentelemetry.sdk._logs import LoggingHandler as OtelLoggingHandler
+    
     for handler in root_logger.handlers[:]:
+        # OTel LoggingHandler는 보존
+        if isinstance(handler, OtelLoggingHandler):
+            continue
         root_logger.removeHandler(handler)
     
     # 콘솔 핸들러 추가
