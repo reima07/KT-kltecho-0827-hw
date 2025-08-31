@@ -124,44 +124,18 @@ def async_log_api_stats(endpoint, method, status, user_id):
                 'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
             }
             
-            # 구조화된 로깅으로 기록
-            log_info("API call statistics",
-                     endpoint=endpoint,
-                     method=method,
-                     status=status,
-                     user_id=user_id,
-                     message=log_data['message'])
-            
             # Redis에 카프카 로그 저장 (주요 로그 저장소)
             try:
                 redis_client = get_redis_connection()
                 redis_client.lpush('kafka_logs', json.dumps(log_data))
                 redis_client.ltrim('kafka_logs', 0, 99)  # 최근 100개 로그만 유지
                 redis_client.close()
-                log_debug("Kafka log saved to Redis", log_data=log_data)
+                print(f"Kafka log saved to Redis: {log_data}")
             except Exception as redis_error:
-                log_error("Redis logging error", error=str(redis_error))
-            
-            # 카프카에도 메시지 전송 (선택적)
-            try:
-                log_debug("Creating Kafka producer", endpoint=endpoint)
-                producer = get_kafka_producer()
-                log_debug("Kafka producer created successfully")
-                log_debug("Sending message to Kafka", log_data=log_data)
-                producer.send('api-logs', log_data)
-                producer.flush()
-                log_debug("Message sent to Kafka successfully")
-                producer.close()
-            except Exception as kafka_error:
-                log_error("Kafka logging error", 
-                         error=str(kafka_error),
-                         endpoint=endpoint,
-                         kafka_server=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
-                         topic='api-logs',
-                         error_type=type(kafka_error).__name__)
+                print(f"Redis logging error: {str(redis_error)}")
                 
         except Exception as e:
-            log_error("Logging error", error=str(e))
+            print(f"Logging error: {str(e)}")
     
     # 새로운 스레드에서 로깅 실행
     Thread(target=_log).start()
