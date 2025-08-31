@@ -69,7 +69,7 @@ spec:
         - name: OTEL_EXPORTER_OTLP_PROTOCOL
           value: "http/protobuf"
         - name: OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
-          value: "http://collector.lgtm.20.249.154.255.nip.io:4318/v1/logs"
+          value: "http://collector.lgtm.20.249.154.255.nip.io/v1/logs"
 ---
 apiVersion: v1
 kind: Service
