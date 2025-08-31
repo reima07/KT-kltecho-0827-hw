@@ -174,10 +174,14 @@ def save_to_db():
             span.set_attribute("message.length", len(data.get('message', '')))
             span.set_attribute("message.preview", data.get('message', '')[:30])
             
-            log_info("Database message save started",
-                     user_id=user_id,
-                     message_length=len(data.get('message', '')),
-                     message_preview=data.get('message', '')[:30])
+            # log_info 호출을 수동 트레이스 내부로 이동
+            try:
+                log_info("Database message save started",
+                         user_id=user_id,
+                         message_length=len(data.get('message', '')),
+                         message_preview=data.get('message', '')[:30])
+            except Exception as log_error:
+                print(f"DEBUG: Log error (expected): {log_error}")
             
             # DB 연결 트레이스
             with tracer.start_as_current_span("database_connection") as db_span:
