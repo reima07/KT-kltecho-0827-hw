@@ -166,7 +166,18 @@ export default {
           user: this.currentUser || 'anonymous'
         });
       }
-      console.log(`User action tracked: ${action}`, details);
+      
+      // 구조화된 로그 출력 (Loki용)
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        message: `User action: ${action}`,
+        service_name: 'jiwoo-frontend',
+        action: action,
+        user: this.currentUser || 'anonymous',
+        ...details
+      };
+      console.log(JSON.stringify(logEntry));
     },
 
     // API 호출 추적 메서드

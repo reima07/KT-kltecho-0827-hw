@@ -21,7 +21,8 @@ class StructuredFormatter(logging.Formatter):
             'message': record.getMessage(),
             'module': record.module,
             'function': record.funcName,
-            'line': record.lineno
+            'line': record.lineno,
+            'service_name': os.getenv('OTEL_SERVICE_NAME', 'jiwoo-backend')
         }
         
         # 요청 컨텍스트 정보 추가

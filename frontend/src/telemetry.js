@@ -87,10 +87,27 @@ export function logEvent(eventName, attributes = {}) {
     span.addEvent('user_event', {
         'event.name': eventName,
         'event.timestamp': new Date().toISOString(),
+        'service_name': SERVICE_NAME,
         ...attributes
     });
     
     span.end();
+}
+
+/**
+ * 구조화된 로그 출력 (Loki용)
+ */
+export function logStructured(level, message, attributes = {}) {
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: level,
+        message: message,
+        service_name: SERVICE_NAME,
+        ...attributes
+    };
+    
+    // 콘솔에 JSON 형태로 출력 (Loki가 수집)
+    console.log(JSON.stringify(logEntry));
 }
 
 /**
