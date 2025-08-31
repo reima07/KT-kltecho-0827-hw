@@ -29,6 +29,13 @@ spec:
           value: "jiwoo-frontend"
         - name: VUE_APP_OTEL_RESOURCE_ATTRIBUTES
           value: "service.name=jiwoo-frontend,service.version=1.0.0,deployment.environment=production"
+        # OTLP 로그 전송 환경변수 추가
+        - name: VUE_APP_OTEL_LOGS_EXPORTER
+          value: "otlp"
+        - name: VUE_APP_OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "http/protobuf"
+        - name: VUE_APP_OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
+          value: "http://collector.lgtm.20.249.154.255.nip.io:4318/v1/logs"
 ---
 apiVersion: v1
 kind: Service

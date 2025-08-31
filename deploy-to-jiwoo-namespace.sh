@@ -47,6 +47,15 @@ helm install jiwoo-mariadb bitnami/mariadb \
   --debug
 echo "   ✅ MariaDB 설치 완료"
 
+echo "   - Promtail 설치 중..."
+helm install promtail grafana/promtail \
+  --namespace jiwoo \
+  --set "config.lokiAddress=http://collector.lgtm.20.249.154.255.nip.io/loki" \
+  --wait \
+  --timeout 300s \
+  --debug
+echo "   ✅ Promtail 설치 완료"
+
 # 4단계: 초기화 Job 실행
 echo "🔧 4단계: 초기화 Job 실행"
 
@@ -98,6 +107,7 @@ echo "🎉 배포가 성공적으로 완료되었습니다!"
 echo "📊 접속 정보:"
 echo "   - 프론트엔드: LoadBalancer IP 확인 필요"
 echo "   - 백엔드 API: ClusterIP (내부 접속)"
+echo "   - Grafana Loki: http://grafana.20.249.154.255.nip.io"
 echo ""
 echo "🔍 LoadBalancer IP 확인:"
 echo "   kubectl get service jiwoo-frontend-service -n jiwoo"
@@ -106,3 +116,4 @@ echo "🔧 유용한 명령어:"
 echo "   - 전체 상태 확인: kubectl get all -n jiwoo"
 echo "   - Pod 로그 확인: kubectl logs <pod-name> -n jiwoo"
 echo "   - Pod 상세 정보: kubectl describe pod <pod-name> -n jiwoo"
+echo "   - Promtail 상태: kubectl get pods -n jiwoo | grep promtail"

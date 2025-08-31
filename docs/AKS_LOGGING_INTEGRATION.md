@@ -89,3 +89,73 @@
 ### [2025-08-31] - 2단계: 백엔드 로깅 코드 구현 ✅
 - [ ] 4단계: Collector 연동 테스트
 - [ ] 5단계: Grafana에서 데이터 확인
+
+### [2025-08-31] - 5단계: API 엔드포인트 수정 및 서비스명 로깅 개선 ✅
+- [x] **API 엔드포인트 수정**
+  - 백엔드 모든 엔드포인트에 `/api` 프리픽스 추가
+  - 프론트엔드 호환성 문제 해결
+  - `/logs/kafka` → `/api/logs/kafka` 등 모든 엔드포인트 수정
+
+- [x] **서비스명 로깅 개선**
+  - 백엔드: `logging_config.py`에 `service_name` 필드 추가
+  - 프론트엔드: 사용자 액션 추적에 구조화된 로깅 추가
+  - Loki에서 `service_name` 라벨로 서비스 구분 가능
+
+- [x] **새로운 이미지 빌드 및 배포**
+  - GitHub Actions를 통한 자동 빌드/배포
+  - 백엔드: `jiwoo-backend:v1.0.2`
+  - 프론트엔드: 최신 버전
+
+- [ ] **Grafana에서 로그 확인** (다음 단계)
+  - Loki에서 `service_name="jiwoo-backend"` 및 `service_name="jiwoo-frontend"` 확인
+  - 구조화된 로그 형태로 데이터 수집 확인
+
+### [2025-08-31] - 6단계: 카프카 로그 문제 최종 해결 ✅
+- [x] **문제 진단**
+  - Redis에서 예전 로그들만 계속 표시되는 문제
+  - `jiwoo2` 사용자 로그인 후 새로운 로그가 생성되지 않는 문제
+  - `async_log_api_stats` 함수에서 에러 발생
+
+- [x] **Redis 로그 관리 개선**
+  - 백엔드에서 최신 로그 50개만 가져오도록 수정 (`lrange('kafka_logs', -50, -1)`)
+  - Redis의 `kafka_logs` 초기화로 오래된 로그 제거
+
+- [x] **async_log_api_stats 함수 단순화**
+  - 복잡한 로깅 구조로 인한 에러 해결
+  - Kafka 관련 코드 제거 (Redis만 사용)
+  - 간단한 `print` 문으로 디버깅 개선
+
+- [x] **최종 테스트 완료**
+  - `jiwoo2` 사용자 로그인 성공
+  - DB 메시지 저장 시 새로운 로그 생성 확인
+  - 카프카 로그 조회에서 최신 로그 정상 표시
+
+### [2025-08-31] - 7단계: Promtail 설치 및 로그 수집 완료 ✅
+- [x] **문제 진단**
+  - 145 AKS의 Pod 로그가 144 AKS의 Grafana Loki로 전송되지 않는 문제
+  - Promtail이 설치되지 않아서 로그 수집이 안됨
+
+- [x] **Promtail 설치**
+  - Grafana Helm 차트 저장소 추가
+  - Promtail 설치: `helm install promtail grafana/promtail --namespace jiwoo`
+  - Loki 엔드포인트 설정: `http://collector.lgtm.20.249.154.255.nip.io/loki`
+
+- [x] **로그 수집 설정**
+  - Kubernetes Pod 자동 발견
+  - 서비스명 라벨링 (`service_name`)
+  - 구조화된 JSON 로그 수집
+
+- [x] **최종 테스트**
+  - 프론트엔드/백엔드 롤아웃 완료
+  - Promtail DaemonSet 실행 중
+  - Grafana Loki에서 로그 확인 준비 완료
+
+### [2025-08-31] - 8단계: Grafana 로그 확인 (최종 단계)
+- [ ] **Grafana Loki에서 로그 확인**
+  - `service_name="jiwoo-backend"` 및 `service_name="jiwoo-frontend"` 확인
+  - 구조화된 JSON 로그 형태로 데이터 수집 확인
+  - 사용자 액션 로그 확인
+
+- [ ] **Grafana Tempo에서 트레이스 확인**
+  - API 호출 트레이스 확인
+  - 서비스 간 연결 관계 확인

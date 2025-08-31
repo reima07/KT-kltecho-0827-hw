@@ -1,8 +1,60 @@
 # 배포 문제 해결 가이드
 
-## 🚨 해결된 문제들 (시간순)
+## ✅ 해결된 문제들
 
-### [2025-08-31] 1. 카프카 로그 조회 문제
+### [2025-08-31] 카프카 로그 문제 최종 해결 ✅
+**문제**: Redis에서 예전 로그만 표시되고 새로운 로그가 생성되지 않는 문제
+
+**근본 원인**:
+- `async_log_api_stats` 함수에서 복잡한 로깅 구조로 인한 에러 발생
+- Kafka 관련 코드에서 에러가 발생하여 전체 로깅 실패
+- Redis에 저장된 오래된 로그들이 계속 표시됨
+
+**해결 과정**:
+1. **Redis 로그 관리 개선**
+   ```python
+   # 백엔드에서 최신 로그 50개만 가져오도록 수정
+   logs = redis_client.lrange('kafka_logs', -50, -1)
+   ```
+
+2. **async_log_api_stats 함수 단순화**
+   ```python
+   # 복잡한 로깅 구조 제거, Redis 저장만 남김
+   def async_log_api_stats(endpoint, method, status, user_id):
+       def _log():
+           try:
+               log_data = {
+                   'timestamp': datetime.now().isoformat(),
+                   'endpoint': endpoint,
+                   'method': method,
+                   'status': status,
+                   'user_id': user_id,
+                   'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
+               }
+               
+               # Redis에 카프카 로그 저장
+               redis_client = get_redis_connection()
+               redis_client.lpush('kafka_logs', json.dumps(log_data))
+               redis_client.ltrim('kafka_logs', 0, 99)
+               redis_client.close()
+           except Exception as e:
+               print(f"Logging error: {str(e)}")
+       
+       Thread(target=_log).start()
+   ```
+
+3. **Redis 초기화**
+   ```bash
+   # 오래된 로그 제거
+   kubectl exec -n jiwoo jiwoo-redis-master-0 -- redis-cli -a $PASSWORD del kafka_logs
+   ```
+
+**결과**: 
+- `jiwoo2` 사용자 로그인 후 새로운 API 호출 로그가 정상적으로 생성
+- 카프카 로그 조회에서 최신 로그가 정상적으로 표시
+- 로깅 시스템 안정성 향상
+
+### [2025-08-31] API 엔드포인트 404 에러 해결 ✅
 
 #### 문제 상황
 - 프론트엔드에서 카프카 로그 조회 시 빈 배열 반환
@@ -345,6 +397,170 @@ controller:
 
 #### 결과
 - ✅ 효율적인 배포 시간
+
+---
+
+### [2025-08-31] Grafana Loki 로그 수집 문제 해결 ✅
+**문제**: 145 AKS의 Pod 로그가 144 AKS의 Grafana Loki로 전송되지 않는 문제
+
+**근본 원인**:
+- 145 AKS에 Promtail이 설치되지 않아서 Pod 로그를 수집하지 못함
+- `ama-logs`는 Azure Monitor용이고 Grafana Loki용이 아님
+- 네트워크 연결 문제로 원격 Loki로 로그 전송 불가
+
+**해결 과정**:
+1. **Promtail 설치**
+   ```bash
+   # Grafana Helm 차트 저장소 추가
+   helm repo add grafana https://grafana.github.io/helm-charts
+   helm repo update
+   
+   # Promtail 설치
+   helm install promtail grafana/promtail --namespace jiwoo \
+     --set "config.lokiAddress=http://collector.lgtm.20.249.154.255.nip.io/loki"
+   ```
+
+2. **로그 수집 설정**
+   - Kubernetes Pod 자동 발견
+   - 서비스명 라벨링 (`service_name`)
+   - 구조화된 JSON 로그 수집
+
+3. **최종 테스트**
+   ```bash
+   # 프론트엔드/백엔드 롤아웃
+   kubectl rollout restart deployment/jiwoo-frontend -n jiwoo
+   kubectl rollout restart deployment/jiwoo-backend -n jiwoo
+   
+   # Promtail 상태 확인
+   kubectl get pods -n jiwoo | grep promtail
+   ```
+
+**결과**: 
+- Promtail DaemonSet이 모든 노드에서 실행 중
+- 145 AKS의 Pod 로그가 144 AKS의 Grafana Loki로 자동 전송
+- Grafana에서 `service_name="jiwoo-backend"` 및 `service_name="jiwoo-frontend"` 로그 확인 가능
+
+### [2025-08-31] OpenTelemetry SpanStatusCode 에러 해결 ✅
+
+#### 문제 상황
+- 프론트엔드에서 카프카 로그 조회 시 빈 배열 반환
+- 백엔드 API는 200 응답을 반환하지만 실제 로그 데이터 없음
+- 카프카 컨트롤러에 직접 접근 시 명령어가 멈춤
+
+#### 원인 분석
+1. **카프카 인증 설정 불일치**
+   - `k8s/kafka-values.yaml`에서 `auth.enabled: false`
+   - 백엔드 코드에서는 SASL 인증 사용 시도
+   - 인증 설정 불일치로 연결 실패
+
+2. **카프카 토픽 자동 생성 문제**
+   - `api-logs` 토픽이 존재하지 않을 가능성
+   - 토픽 자동 생성 설정이 제대로 작동하지 않음
+
+3. **프론트엔드 데이터 구조 불일치**
+   - 백엔드: `{method, endpoint, message, timestamp, user_id}`
+   - 프론트엔드: `log.action`, `log.details` 사용 시도
+
+#### 해결 방법
+
+##### 1단계: 카프카 인증 제거
+```python
+# backend/app.py - get_kafka_producer()
+def get_kafka_producer():
+    return KafkaProducer(
+        bootstrap_servers=os.getenv('KAFKA_SERVERS', 'jiwoo-kafka:9092'),
+        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+        acks='all',
+        retries=3
+    )
+```
+
+##### 2단계: Redis 이중 저장 구현
+```python
+# backend/app.py - async_log_api_stats()
+def async_log_api_stats(endpoint, method, status, user_id):
+    def _log():
+        log_data = {
+            'timestamp': datetime.now().isoformat(),
+            'endpoint': endpoint,
+            'method': method,
+            'status': status,
+            'user_id': user_id,
+            'message': f"{user_id}가 {method} {endpoint} 호출 ({status})"
+        }
+        
+        # Redis에 카프카 로그 저장 (주요 로그 저장소)
+        try:
+            redis_client = get_redis_connection()
+            redis_client.lpush('kafka_logs', json.dumps(log_data))
+            redis_client.ltrim('kafka_logs', 0, 99)  # 최근 100개 로그만 유지
+            redis_client.close()
+        except Exception as redis_error:
+            print(f"Redis logging error: {str(redis_error)}")
+        
+        # 카프카에도 메시지 전송 (선택적)
+        try:
+            producer = get_kafka_producer()
+            producer.send('api-logs', log_data)
+            producer.flush()
+            producer.close()
+        except Exception as kafka_error:
+            print(f"Kafka logging error: {str(kafka_error)}")
+```
+
+##### 3단계: 카프카 로그 조회를 Redis에서 수행
+```python
+# backend/app.py - get_kafka_logs()
+@app.route('/logs/kafka', methods=['GET'])
+@login_required
+def get_kafka_logs():
+    try:
+        redis_client = get_redis_connection()
+        logs = redis_client.lrange('kafka_logs', 0, -1)
+        redis_client.close()
+        
+        # JSON 파싱 및 시간 역순 정렬
+        parsed_logs = []
+        for log in logs:
+            try:
+                log_data = json.loads(log)
+                parsed_logs.append(log_data)
+            except:
+                continue
+        
+        parsed_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return jsonify(parsed_logs)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+```
+
+##### 4단계: 프론트엔드 표시 형식 수정
+```vue
+<!-- frontend/src/App.vue -->
+<li v-for="(log, index) in kafkaLogs.slice(0, 10)" :key="index">
+  [{{ formatDate(log.timestamp) }}] {{ log.method }} {{ log.endpoint }}: {{ log.message }}
+</li>
+```
+
+##### 5단계: 메시지 표시 제한
+```vue
+<!-- frontend/src/App.vue -->
+<h3>저장된 메시지 (최근 10개):</h3>
+<ul>
+  <li v-for="item in dbData.slice(0, 10)" :key="item.id">
+    {{ item.message }} ({{ formatDate(item.created_at) }})
+  </li>
+</ul>
+<p v-if="dbData.length > 10" class="log-note">
+  * 최근 10개 메시지만 표시됩니다. (총 {{ dbData.length }}개)
+</p>
+```
+
+#### 결과
+- ✅ 카프카 로그 조회 정상 작동
+- ✅ 프론트엔드에서 로그 표시 완료
+- ✅ 메시지 목록 10개 제한 적용
+- ✅ 이중 저장으로 안정성 향상
 
 ---
 

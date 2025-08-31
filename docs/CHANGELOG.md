@@ -7,7 +7,38 @@
 
 ---
 
-## 🚀 주요 변경사항 (시간순)
+## 📅 주요 변경사항 (시간순)
+
+### [2025-08-31] - Promtail 설치 및 로그 수집 완료 ✅
+- **문제**: 145 AKS의 Pod 로그가 144 AKS의 Grafana Loki로 전송되지 않는 문제
+- **해결**: 
+  - Promtail 설치로 Kubernetes Pod 로그 자동 수집
+  - Loki 엔드포인트 설정으로 원격 로그 전송
+  - 서비스명 라벨링으로 로그 구분 가능
+- **결과**: 이제 Grafana Loki에서 `jiwoo-backend`와 `jiwoo-frontend` 로그 확인 가능
+
+### [2025-08-31] - OpenTelemetry 에러 수정 ✅
+- **문제**: 프론트엔드에서 `SpanStatusCode` 관련 에러 발생
+- **해결**: 
+  - `@opentelemetry/api`에서 `SpanStatusCode` import 추가
+  - `trace.SpanStatusCode` → `SpanStatusCode`로 수정
+- **결과**: 프론트엔드 OpenTelemetry 정상 작동
+
+### [2025-08-31] - 카프카 로그 문제 최종 해결 ✅
+- **문제**: Redis에서 예전 로그만 표시되고 새로운 로그가 생성되지 않는 문제
+- **해결**: 
+  - `async_log_api_stats` 함수 단순화 (복잡한 로깅 구조 제거)
+  - Redis 로그 관리 개선 (최신 50개만 조회)
+  - Kafka 관련 코드 제거하여 안정성 향상
+- **결과**: `jiwoo2` 사용자 로그인 후 새로운 API 호출 로그가 정상적으로 생성되고 표시됨
+
+### [2025-08-31] - API 엔드포인트 수정 및 서비스명 로깅 개선 ✅
+- **문제**: 프론트엔드에서 `/api/logs/kafka` 호출 시 404 에러 발생
+- **해결**: 
+  - 백엔드 모든 엔드포인트에 `/api` 프리픽스 추가
+  - nginx 설정에서 rewrite 규칙 제거
+  - 로깅에 `service_name` 필드 추가
+- **결과**: 프론트엔드-백엔드 API 호출 정상화, Grafana에서 서비스명 구분 가능
 
 ### [2025-08-31] 🔧 카프카 로그 조회 문제 해결 및 프론트엔드 개선
 

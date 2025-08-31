@@ -69,6 +69,10 @@ echo "   - Redis 삭제 중..."
 helm uninstall jiwoo-redis -n jiwoo --ignore-not-found=true
 echo "   ✅ Redis 삭제 완료"
 
+echo "   - Promtail 삭제 중..."
+helm uninstall promtail -n jiwoo --ignore-not-found=true
+echo "   ✅ Promtail 삭제 완료"
+
 # 5단계: 네임스페이스 삭제
 echo "🗑️ 5단계: 네임스페이스 삭제"
 
@@ -90,5 +94,5 @@ echo "   - 기존 Secret (default 네임스페이스)"
 echo "   - 애플리케이션 (Frontend, Backend)"
 echo "   - Secret"
 echo "   - 초기화 Job"
-echo "   - Helm 릴리스 (MariaDB, Kafka, Redis)"
+echo "   - Helm 릴리스 (MariaDB, Kafka, Redis, Promtail)"
 echo "   - 네임스페이스"
