@@ -38,10 +38,13 @@
             <p>데이터를 불러오는 중...</p>
           </div>
           <div v-if="dbData.length && !loading">
-            <h3>저장된 메시지:</h3>
+            <h3>저장된 메시지 (최근 10개):</h3>
             <ul>
-              <li v-for="item in dbData" :key="item.id">{{ item.message }} ({{ formatDate(item.created_at) }})</li>
+              <li v-for="item in dbData.slice(0, 10)" :key="item.id">{{ item.message }} ({{ formatDate(item.created_at) }})</li>
             </ul>
+            <p v-if="dbData.length > 10" class="log-note">
+              * 최근 10개 메시지만 표시됩니다. (총 {{ dbData.length }}개)
+            </p>
           </div>
         </div>
 
@@ -68,7 +71,7 @@
             <h3>API 통계 로그 (최근 10개):</h3>
             <ul>
               <li v-for="(log, index) in kafkaLogs.slice(0, 10)" :key="index">
-                [{{ formatDate(log.timestamp) }}] {{ log.action }}: {{ log.details }}
+                [{{ formatDate(log.timestamp) }}] {{ log.method }} {{ log.endpoint }}: {{ log.message }}
               </li>
             </ul>
             <p v-if="kafkaLogs.length > 10" class="log-note">
