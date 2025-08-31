@@ -157,9 +157,14 @@ def login_required(f):
 @app.route('/api/db/message', methods=['POST'])
 @login_required
 def save_to_db():
+    print(f"=== FUNCTION ENTRY ===")
+    print(f"DEBUG: save_to_db function called")
     try:
+        print(f"DEBUG: Getting user_id from session")
         user_id = session['user_id']
+        print(f"DEBUG: Getting data from request")
         data = request.json
+        print(f"DEBUG: Got data: {data}")
         
         print(f"=== MANUAL TRACE DEBUG START ===")
         print(f"DEBUG: About to start manual trace for POST /api/db/message")
