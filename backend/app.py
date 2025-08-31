@@ -148,97 +148,43 @@ def async_log_api_stats(endpoint, method, status, user_id):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        print(f"=== LOGIN_REQUIRED DEBUG ===")
-        print(f"DEBUG: Checking session: {session}")
-        print(f"DEBUG: user_id in session: {'user_id' in session}")
-        print(f"DEBUG: All session keys: {list(session.keys())}")
         if 'user_id' not in session:
-            print(f"DEBUG: Login required - user_id not in session")
-            # 임시로 테스트용 user_id 설정
-            session['user_id'] = 'jiwoo'
-            print(f"DEBUG: Set temporary user_id: {session['user_id']}")
-        print(f"DEBUG: Login OK - proceeding to function")
+            return jsonify({"status": "error", "message": "로그인이 필요합니다"}), 401
         return f(*args, **kwargs)
     return decorated_function
 
 # MariaDB 엔드포인트
 @app.route('/api/db/message', methods=['POST'])
-# @login_required  # 임시로 주석 처리
+@login_required
 def save_to_db():
-    print(f"=== FUNCTION ENTRY ===")
-    print(f"DEBUG: save_to_db function called")
     try:
-        print(f"DEBUG: Getting user_id from session")
-        # user_id = session['user_id']  # 임시로 주석 처리
-        user_id = "jiwoo"  # 임시로 하드코딩
-        print(f"DEBUG: Getting data from request")
+        user_id = session['user_id']
         data = request.json
-        print(f"DEBUG: Got data: {data}")
         
-        print(f"=== MANUAL TRACE DEBUG START ===")
-        print(f"DEBUG: About to start manual trace for POST /api/db/message")
+        log_info("Database message save started",
+                 user_id=user_id,
+                 message_length=len(data.get('message', '')),
+                 message_preview=data.get('message', '')[:30])
         
-        # 수동 트레이스 시작
-        tracer = trace.get_tracer(__name__)
-        print(f"DEBUG: Tracer created: {tracer}")
+        db = get_db_connection()
+        cursor = db.cursor()
         
-        with tracer.start_as_current_span("save_message_to_db") as span:
-            print(f"DEBUG: Created save_message_to_db span: {span}")
-            span.set_attribute("user.id", user_id)
-            span.set_attribute("message.length", len(data.get('message', '')))
-            span.set_attribute("message.preview", data.get('message', '')[:30])
-            
-            # log_info 호출을 수동 트레이스 내부로 이동
-            try:
-                log_info("Database message save started",
-                         user_id=user_id,
-                         message_length=len(data.get('message', '')),
-                         message_preview=data.get('message', '')[:30])
-            except Exception as log_error:
-                print(f"DEBUG: Log error (expected): {log_error}")
-            
-            # DB 연결 트레이스
-            with tracer.start_as_current_span("database_connection") as db_span:
-                print(f"DEBUG: Created database_connection span: {db_span}")
-                db_span.set_attribute("db.system", "mysql")
-                db_span.set_attribute("db.name", "jiwoo_db")
-                db = get_db_connection()
-            
-            cursor = db.cursor()
-            
-            # SQL 실행 트레이스
-            with tracer.start_as_current_span("sql_execution") as sql_span:
-                print(f"DEBUG: Created sql_execution span: {sql_span}")
-                sql_span.set_attribute("db.statement", "INSERT INTO messages")
-                sql_span.set_attribute("db.operation", "INSERT")
-                # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
-                sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
-                cursor.execute(sql, (data['message'], user_id, datetime.now()))
-                db.commit()
-            
-            cursor.close()
-            db.close()
-            
-            log_info("Database message save completed",
-                     user_id=user_id,
-                     message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
-            
-            # Redis 로깅 트레이스
-            with tracer.start_as_current_span("redis_logging") as redis_span:
-                print(f"DEBUG: Created redis_logging span: {redis_span}")
-                redis_span.set_attribute("redis.operation", "log_to_redis")
-                log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
-            
-            print(f"=== MANUAL TRACE DEBUG END ===")
-            async_log_api_stats('/db/message', 'POST', 'success', user_id)
-            return jsonify({"status": "success"})
+        # [변경사항] user_id도 함께 저장하도록 SQL 쿼리 수정
+        sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
+        cursor.execute(sql, (data['message'], user_id, datetime.now()))
+        db.commit()
+        
+        cursor.close()
+        db.close()
+        
+        log_info("Database message save completed",
+                 user_id=user_id,
+                 message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
+        
+        log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
+        async_log_api_stats('/db/message', 'POST', 'success', user_id)
+        return jsonify({"status": "success"})
     except Exception as e:
-        # 에러 트레이스
-        current_span = trace.get_current_span()
-        if current_span:
-            current_span.record_exception(e)
-            current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-        
         log_error("Database message save failed",
                   user_id=user_id,
                   error=str(e),
@@ -253,42 +199,20 @@ def get_from_db():
     try:
         user_id = session['user_id']
         
-        # 수동 트레이스 시작
-        tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("get_messages_from_db") as span:
-            span.set_attribute("user.id", user_id)
-            span.set_attribute("db.operation", "SELECT")
-            
-            # DB 연결 트레이스
-            with tracer.start_as_current_span("database_connection") as db_span:
-                db_span.set_attribute("db.system", "mysql")
-                db_span.set_attribute("db.name", "jiwoo_db")
-                db = get_db_connection()
-            
-            cursor = db.cursor(dictionary=True)
-            
-            # SQL 실행 트레이스
-            with tracer.start_as_current_span("sql_execution") as sql_span:
-                sql_span.set_attribute("db.statement", "SELECT * FROM messages ORDER BY created_at DESC")
-                sql_span.set_attribute("db.operation", "SELECT")
-                cursor.execute("SELECT * FROM messages ORDER BY created_at DESC")
-                messages = cursor.fetchall()
-                sql_span.set_attribute("db.result.count", len(messages))
-            
-            cursor.close()
-            db.close()
-            
-            # 비동기 로깅으로 변경
-            async_log_api_stats('/db/messages', 'GET', 'success', user_id)
-            
-            return jsonify(messages)
-    except Exception as e:
-        # 에러 트레이스
-        current_span = trace.get_current_span()
-        if current_span:
-            current_span.record_exception(e)
-            current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+        db = get_db_connection()
+        cursor = db.cursor(dictionary=True)
         
+        cursor.execute("SELECT * FROM messages ORDER BY created_at DESC")
+        messages = cursor.fetchall()
+        
+        cursor.close()
+        db.close()
+        
+        # 비동기 로깅으로 변경
+        async_log_api_stats('/db/messages', 'GET', 'success', user_id)
+        
+        return jsonify(messages)
+    except Exception as e:
         if 'user_id' in session:
             async_log_api_stats('/db/messages', 'GET', 'error', session['user_id'])
         return jsonify({"status": "error", "message": str(e)}), 500
