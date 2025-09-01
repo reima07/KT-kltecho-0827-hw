@@ -40,52 +40,92 @@ except RuntimeError:
 
 **결과**: 로그인 정상 작동, 로깅 오류 해결
 
-### 3. 트레이스 미생성 문제
+### 3. 트레이스 미생성 문제 (해결됨)
 **문제**: `POST /api/db/message` 요청 시 Redis LTRIM 스팬만 생성되고 API 트레이스가 생성되지 않음
 
 **원인**: `@login_required` 데코레이터에서 세션 체크 실패로 함수 본문이 실행되지 않음
 
+**해결 과정**:
+1. **테스트용 임시 제거** (트레이스 확인용):
+   ```python
+   # @login_required  # 테스트용으로 임시 제거
+   def save_to_db():
+       # user_id = session['user_id']  # 테스트용으로 임시 주석
+       user_id = "test_user"  # 테스트용 하드코딩
+   ```
+
+2. **최종 해결** (운영 환경용):
+   ```python
+   @login_required
+   def save_to_db():
+       user_id = session['user_id']  # 실제 사용자 ID 사용
+   ```
+
+**결과**: 완전한 트레이스 체인 생성 (Flask → DB → Redis), 실제 사용자별 데이터 분리
+
+### 4. 수동 트레이스 제거 및 코드 정리 (최종)
+**문제**: 수동 트레이스가 코드를 복잡하게 만들고 유지보수성 저하
+
 **해결 방법**:
 ```python
-# 테스트용으로 임시 제거
-# @login_required
-def save_to_db():
-    # user_id = session['user_id']  # 테스트용으로 임시 주석
-    user_id = "test_user"  # 테스트용 하드코딩
+# 수동 트레이스 제거, 자동 계측만 사용
+log_info("Database message save started",
+         user_id=user_id,
+         message_length=len(data.get('message', '')),
+         message_preview=data.get('message', '')[:30])
+
+db = get_db_connection()
+cursor = db.cursor()
+
+# user_id도 함께 저장하도록 SQL 쿼리 수정
+sql = "INSERT INTO messages (message, user_id, created_at) VALUES (%s, %s, %s)"
+cursor.execute(sql, (data['message'], user_id, datetime.now()))
+db.commit()
+
+cursor.close()
+db.close()
+
+log_info("Database message save completed",
+         user_id=user_id,
+         message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
+
+log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
 ```
 
-**결과**: 완전한 트레이스 체인 생성 (Flask → 수동 스팬 → DB → Redis)
+**결과**: 깔끔한 자동 계측 트레이스, 코드 가독성 향상, 유지보수성 개선
 
-### 4. 수동 트레이스 추가
-**문제**: 자동 계측만으로는 상세한 트레이스 정보 부족
+### 5. 사용자별 메시지 필터링 추가
+**문제**: 모든 사용자의 메시지가 공유되어 보안 문제 발생
 
 **해결 방법**:
 ```python
-# 수동 트레이스 추가
-tracer = trace.get_tracer(__name__)
-with tracer.start_as_current_span("save_message_to_db") as span:
-    span.set_attribute("user.id", user_id)
-    span.set_attribute("message.length", len(data.get('message', '')))
-    
-    # DB 연결 트레이스
-    with tracer.start_as_current_span("database_connection") as db_span:
-        db_span.set_attribute("db.system", "mysql")
-        db_span.set_attribute("db.name", "jiwoo_db")
-        db = get_db_connection()
-    
-    # SQL 실행 트레이스
-    with tracer.start_as_current_span("sql_execution") as sql_span:
-        sql_span.set_attribute("db.statement", "INSERT INTO messages")
-        sql_span.set_attribute("db.operation", "INSERT")
-        # SQL 실행...
-    
-    # Redis 로깅 트레이스
-    with tracer.start_as_current_span("redis_logging") as redis_span:
-        redis_span.set_attribute("redis.operation", "log_to_redis")
+# get_from_db 함수 수정
+cursor.execute("SELECT * FROM messages WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
+```
+
+**결과**: 사용자별 데이터 분리, 보안 강화
+
+### 6. 들여쓰기 오류 수정
+**문제**: 코드 수정 중 IndentationError 발생
+
+**원인**: 수동 트레이스 제거 과정에서 들여쓰기 실수
+
+**해결 방법**:
+```python
+# 수정 전 (잘못된 들여쓰기)
         log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
+            
+            async_log_api_stats('/db/message', 'POST', 'success', user_id)
+            return jsonify({"status": "success"})
+
+# 수정 후 (올바른 들여쓰기)
+        log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
+        
+        async_log_api_stats('/db/message', 'POST', 'success', user_id)
+        return jsonify({"status": "success"})
 ```
 
-**결과**: 상세한 트레이스 체인으로 성능 분석 및 디버깅 가능
+**결과**: 백엔드 정상 실행, CrashLoopBackOff 해결
 
 ---
 

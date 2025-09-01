@@ -9,7 +9,7 @@
 
 ## 📅 주요 변경사항 (시간순)
 
-### [2025-09-01] - OpenTelemetry 통합 완료 ✅
+### [2025-09-01] - OpenTelemetry 통합 완료 및 코드 정리 ✅
 - **목표**: OpenTelemetry를 통한 구조화된 로깅 및 트레이싱 구현
 - **완료된 작업**:
   - Flask 자동 계측 활성화 (`FlaskInstrumentor`)
@@ -17,12 +17,17 @@
   - Redis 자동 계측 활성화 (`RedisInstrumentor`)
   - OTLP HTTP 익스포터 설정 (포트 4318)
   - 로그-트레이스 연동 (trace_id, span_id 포함)
+  - **코드 정리**: 수동 트레이스 제거, 자동 계측만 사용
+  - **보안 강화**: 사용자별 메시지 필터링 추가 (`WHERE user_id = %s`)
+  - **인증 복원**: `@login_required` 데코레이터 정상화, 실제 사용자 ID 사용
 - **해결된 문제들**:
   - pymysql 모듈 누락으로 인한 CrashLoopBackOff
   - Flask application context 오류
   - `@login_required` 데코레이터로 인한 트레이스 미생성
   - Redis LTRIM만 보이는 문제
-- **결과**: 완전한 트레이스 체인 생성 (Flask → 수동 스팬 → DB → Redis)
+  - **들여쓰기 오류** (IndentationError) 수정
+  - **"test_user" 하드코딩** 제거
+- **결과**: 완전한 트레이스 체인 생성 (Flask → DB → Redis), 실제 사용자별 데이터 분리
 
 ### [2025-08-31] - Promtail 설치 및 로그 수집 완료 ✅
 - **문제**: 145 AKS의 Pod 로그가 144 AKS의 Grafana Loki로 전송되지 않는 문제

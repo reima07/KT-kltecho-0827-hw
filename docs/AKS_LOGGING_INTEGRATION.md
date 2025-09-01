@@ -9,11 +9,13 @@
 
 ## 🎯 최종 완료 상태 (2025-09-01)
 
-### ✅ OpenTelemetry 통합 완료
+### ✅ OpenTelemetry 통합 완료 (최종)
 - **백엔드 자동 계측**: Flask, PyMySQL, Redis
 - **프론트엔드 자동 계측**: Vue.js (DocumentLoad, UserInteraction, Fetch)
-- **트레이스 생성**: 완전한 트레이스 체인 (API → DB → Redis)
+- **트레이스 생성**: 깔끔한 자동 계측 트레이스 (API → DB → Redis)
 - **로그-트레이스 연동**: trace_id, span_id 포함된 구조화된 로그
+- **보안 강화**: 사용자별 메시지 필터링, 실제 사용자 ID 사용
+- **코드 정리**: 수동 트레이스 제거, 유지보수성 향상
 
 ### 📊 현재 작동 중인 기능들
 1. **Grafana Tempo**: 트레이스 시각화 및 분석
@@ -72,8 +74,8 @@ if current_span:
 ## 📈 성능 및 모니터링 지표
 
 ### 트레이스 생성 현황
-- **GET /api/db/messages**: Flask 자동 계측 + MySQL 자동 계측
-- **POST /api/db/message**: Flask 자동 계측 + 수동 스팬 + MySQL + Redis
+- **GET /api/db/messages**: Flask 자동 계측 + MySQL 자동 계측 (사용자별 필터링)
+- **POST /api/db/message**: Flask 자동 계측 + MySQL + Redis (실제 사용자 ID)
 - **로그인/로그아웃**: Flask 자동 계측 + Redis 세션 관리
 
 ### 로그 수집 현황
@@ -88,8 +90,11 @@ if current_span:
 ### 주요 해결된 문제들
 1. **pymysql 모듈 누락**: requirements.txt에 pymysql 추가
 2. **Flask application context 오류**: 로깅 핸들러에 예외 처리 추가
-3. **트레이스 미생성**: `@login_required` 데코레이터 임시 제거
-4. **Redis LTRIM만 보임**: 수동 트레이스 추가로 완전한 체인 생성
+3. **트레이스 미생성**: `@login_required` 데코레이터 정상화, 실제 사용자 ID 사용
+4. **Redis LTRIM만 보임**: 자동 계측으로 완전한 체인 생성
+5. **보안 문제**: 사용자별 메시지 필터링 추가
+6. **코드 복잡성**: 수동 트레이스 제거, 자동 계측만 사용
+7. **들여쓰기 오류**: IndentationError 수정
 
 ### 현재 안정성
 - **99% 이상의 요청 성공률**
