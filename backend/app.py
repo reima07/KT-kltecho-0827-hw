@@ -202,7 +202,7 @@ def get_from_db():
         user_id = session['user_id']
         
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor()
         
         cursor.execute("SELECT * FROM messages ORDER BY created_at DESC")
         messages = cursor.fetchall()
@@ -278,7 +278,7 @@ def login():
             return jsonify({"status": "error", "message": "사용자명과 비밀번호는 필수입니다"}), 400
         
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor()
         cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = cursor.fetchone()
         cursor.close()
@@ -352,7 +352,7 @@ def search_messages():
         
         # DB에서 검색
         db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor()
         sql = "SELECT * FROM messages WHERE message LIKE %s ORDER BY created_at DESC"
         cursor.execute(sql, (f"%{query}%",))
         results = cursor.fetchall()
