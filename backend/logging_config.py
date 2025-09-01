@@ -25,20 +25,25 @@ class StructuredFormatter(logging.Formatter):
             'service_name': os.getenv('OTEL_SERVICE_NAME', 'jiwoo-backend')
         }
         
-        # 요청 컨텍스트 정보 추가
-        if hasattr(g, 'request_id'):
-            log_entry['request_id'] = g.request_id
-        
-        if request:
-            log_entry['endpoint'] = request.endpoint
-            log_entry['method'] = request.method
-            log_entry['path'] = request.path
-            log_entry['remote_addr'] = request.remote_addr
-            log_entry['user_agent'] = request.headers.get('User-Agent', '')
-        
-        # 사용자 정보 추가
-        if hasattr(g, 'user_id'):
-            log_entry['user_id'] = g.user_id
+        # 요청 컨텍스트 정보 추가 (application context 확인)
+        try:
+            from flask import g, request
+            if hasattr(g, 'request_id'):
+                log_entry['request_id'] = g.request_id
+            
+            if request:
+                log_entry['endpoint'] = request.endpoint
+                log_entry['method'] = request.method
+                log_entry['path'] = request.path
+                log_entry['remote_addr'] = request.remote_addr
+                log_entry['user_agent'] = request.headers.get('User-Agent', '')
+            
+            # 사용자 정보 추가
+            if hasattr(g, 'user_id'):
+                log_entry['user_id'] = g.user_id
+        except RuntimeError:
+            # application context 밖에서는 Flask 객체에 접근하지 않음
+            pass
         
         # OpenTelemetry Trace 정보 추가
         current_span = trace.get_current_span()
