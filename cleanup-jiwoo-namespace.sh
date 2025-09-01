@@ -39,6 +39,10 @@ echo "   - 백엔드 삭제 중..."
 kubectl delete -f k8s/jiwoo-backend-deployment.yaml -n jiwoo --ignore-not-found=true
 echo "   ✅ 백엔드 삭제 완료"
 
+echo "   - FastAPI 삭제 중..."
+kubectl delete -f k8s/jiwoo-fastapi-deployment.yaml -n jiwoo --ignore-not-found=true
+echo "   ✅ FastAPI 삭제 완료"
+
 echo "   - Secret 삭제 중..."
 kubectl delete -f k8s/jiwoo-backend-secret.yaml -n jiwoo --ignore-not-found=true
 echo "   ✅ Secret 삭제 완료"
@@ -91,7 +95,7 @@ echo "🎉 jiwoo 네임스페이스 정리가 성공적으로 완료되었습니
 echo "📝 모든 리소스가 삭제되었습니다:"
 echo "   - 기존 Helm 릴리스 (default 네임스페이스)"
 echo "   - 기존 Secret (default 네임스페이스)"
-echo "   - 애플리케이션 (Frontend, Backend)"
+echo "   - 애플리케이션 (Frontend, Backend, FastAPI)"
 echo "   - Secret"
 echo "   - 초기화 Job"
 echo "   - Helm 릴리스 (MariaDB, Kafka, Redis, Promtail)"

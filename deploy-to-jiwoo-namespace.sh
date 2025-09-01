@@ -87,6 +87,11 @@ kubectl apply -f k8s/jiwoo-frontend-deployment.yaml -n jiwoo -v=1
 kubectl rollout status deployment/jiwoo-frontend --timeout=300s -n jiwoo
 echo "   ✅ 프론트엔드 배포 완료"
 
+echo "   - FastAPI 배포 중..."
+kubectl apply -f k8s/jiwoo-fastapi-deployment.yaml -n jiwoo -v=1
+kubectl rollout status deployment/jiwoo-fastapi --timeout=300s -n jiwoo
+echo "   ✅ FastAPI 배포 완료"
+
 # 6단계: 배포 상태 확인
 echo "🔍 6단계: 배포 상태 확인"
 echo ""

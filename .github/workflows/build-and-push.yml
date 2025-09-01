@@ -91,3 +91,43 @@ jobs:
             -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest .
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:${{ steps.datetime.outputs.datetime }}
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-frontend:latest
+
+  # FastAPI 애플리케이션 빌드 및 푸시 작업
+  build-fastapi:
+    runs-on: ubuntu-latest  # Ubuntu 최신 버전에서 실행
+    defaults:
+      run:
+        working-directory: ./  # 루트 디렉토리에서 작업 수행 (FastAPI 파일들이 루트에 있음)
+    steps:
+      # 1단계: GitHub 저장소 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2단계: Docker Buildx 설정 (멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3단계: Azure Container Registry 로그인
+      # GitHub Secrets에서 인증 정보를 가져와 ACR에 로그인
+      - name: Log in to Azure Container Registry (ACR)
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}  # ACR 서버 주소
+          username: ${{ secrets.ACR_USERNAME }}  # GitHub Secrets에서 사용자명 가져오기
+          password: ${{ secrets.ACR_PASSWORD }}  # GitHub Secrets에서 비밀번호 가져오기
+
+      # 4단계: 현재 날짜와 시간 가져오기 (이미지 태그용)
+      # YYYYMMDD_HHMMSS 형식으로 한국 시간(KST) 생성하여 이미지 태그로 사용
+      - name: Get current date and time (KST)
+        id: datetime
+        run: echo "datetime=$(TZ='Asia/Seoul' date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+      # 5단계: Docker 이미지 빌드 및 ACR 푸시
+      # kltecho_jiwoo_날짜시간-fastapi라는 이름으로 이미지 빌드 (한국 시간 기준)
+      # 날짜시간 태그와 latest 태그 두 가지로 푸시
+      - name: Build and push Docker image to ACR
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-fastapi:${{ steps.datetime.outputs.datetime }} \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-fastapi:latest .
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-fastapi:${{ steps.datetime.outputs.datetime }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/kltecho_jiwoo-fastapi:latest

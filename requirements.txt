@@ -1,0 +1,35 @@
+# FastAPI 및 웹 프레임워크
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# 보안
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 데이터베이스 (선택사항)
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# HTTP 클라이언트
+requests==2.31.0
+httpx==0.25.2
+
+# OpenTelemetry Core
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+
+# OpenTelemetry Exporters
+opentelemetry-exporter-otlp-proto-http==1.21.0
+
+# OpenTelemetry Instrumentation
+opentelemetry-instrumentation==0.44b0
+opentelemetry-instrumentation-fastapi==0.44b0
+opentelemetry-instrumentation-requests==0.44b0
+opentelemetry-instrumentation-sqlalchemy==0.44b0
+opentelemetry-instrumentation-logging==0.44b0
+
+# 로깅 및 유틸리티
+python-json-logger==2.0.7
