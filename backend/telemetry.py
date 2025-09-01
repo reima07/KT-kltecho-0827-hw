@@ -15,7 +15,7 @@ from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.mysql import MySQLInstrumentor
+from opentelemetry.instrumentation.pymysql import PyMySQLInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 def setup_telemetry(app):
@@ -66,14 +66,22 @@ def setup_telemetry(app):
     root.setLevel(logging.INFO)
     root.addHandler(handler)
     
-    # Flask 자동 계측
-    FlaskInstrumentor().instrument_app(app)
+    # Flask 자동 계측 (더 명시적으로 설정)
+    FlaskInstrumentor().instrument_app(
+        app,
+        request_hook=lambda span, environ: span.set_attribute("http.request.body", str(environ.get('wsgi.input', ''))),
+        response_hook=lambda span, status, response_headers: span.set_attribute("http.response.status_code", status)
+    )
     
-    # MySQL 자동 계측
-    MySQLInstrumentor().instrument()
+    # PyMySQL 자동 계측 (mysql.connector 대신)
+    PyMySQLInstrumentor().instrument()
     
     # Redis 자동 계측
     RedisInstrumentor().instrument()
     
     print(f"OpenTelemetry 설정 완료 - Collector: {collector_endpoint}")
+    print(f"Flask 자동 계측 활성화됨")
+    print(f"PyMySQL 자동 계측 활성화됨")
+    print(f"Redis 자동 계측 활성화됨")
+    
     return trace.get_tracer(service_name), metrics.get_meter(service_name)

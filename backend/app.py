@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, session, g
 from flask_cors import CORS
 import redis
-import mysql.connector
+import pymysql
 import json
 from datetime import datetime
 import os
@@ -67,11 +67,13 @@ def handle_exception(e):
 # MariaDB 연결 함수
 # [변경사항] database를 환경변수로 변경하여 jiwoo_db 사용
 def get_db_connection():
-    return mysql.connector.connect(
+    return pymysql.connect(
         host=os.getenv('MYSQL_HOST', 'my-mariadb'),
         user=os.getenv('MYSQL_USER', 'testuser'),
         password=os.getenv('MYSQL_PASSWORD'),
-        database=os.getenv('MYSQL_DATABASE', 'jiwoo_db'),  # [변경] testdb → jiwoo_db
+        database=os.getenv('MYSQL_DATABASE', 'jiwoo_db'),
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor,
         connect_timeout=30
     )
 

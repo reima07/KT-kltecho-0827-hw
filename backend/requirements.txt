@@ -16,5 +16,5 @@ opentelemetry-exporter-otlp-proto-http
 opentelemetry-instrumentation
 opentelemetry-instrumentation-flask
 opentelemetry-instrumentation-redis
-opentelemetry-instrumentation-mysql
+opentelemetry-instrumentation-pymysql
 opentelemetry-instrumentation-logging 
