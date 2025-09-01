@@ -184,9 +184,9 @@ def save_to_db():
                  message_id=cursor.lastrowid if hasattr(cursor, 'lastrowid') else 'unknown')
         
         log_to_redis('db_insert', f"Message saved: {data['message'][:30]}...")
-            
-            async_log_api_stats('/db/message', 'POST', 'success', user_id)
-            return jsonify({"status": "success"})
+        
+        async_log_api_stats('/db/message', 'POST', 'success', user_id)
+        return jsonify({"status": "success"})
     except Exception as e:
         log_error("Database message save failed",
                   user_id=user_id,
