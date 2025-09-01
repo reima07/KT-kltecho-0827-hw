@@ -17,6 +17,8 @@ spec:
         app: jiwoo-fastapi
         version: v1
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
       - name: fastapi
         image: ktech4.azurecr.io/kltecho_jiwoo-fastapi:latest

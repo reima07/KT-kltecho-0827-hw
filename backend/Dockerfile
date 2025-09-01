@@ -6,14 +6,13 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 먼저 전체 소스 코드 복사
+# 애플리케이션 소스 복사
 COPY . .
 
-# Secret Key 생성 및 환경변수 설정
-RUN python generate_secret.py > /app/.env
-RUN echo "FLASK_SECRET_KEY=$(cat /app/.env)" > /app/.env
+# 비밀키는 런타임에 주입 (K8s Secret 환경변수 사용)
+# ENV FLASK_SECRET_KEY=""  # Kubernetes에서 주입됨
 
 EXPOSE 5000
-CMD ["python", "app.py"] 
+CMD ["python", "app.py"]

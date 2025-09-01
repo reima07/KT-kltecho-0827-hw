@@ -4,6 +4,7 @@ redis
 kafka-python
 pymysql
 werkzeug
+requests
 
 # OpenTelemetry core
 opentelemetry-api

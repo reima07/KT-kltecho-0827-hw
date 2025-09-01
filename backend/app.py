@@ -11,6 +11,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from threading import Thread
+import requests
 
 
 # OpenTelemetry 및 로깅 설정 import
@@ -30,6 +31,8 @@ tracer, meter = setup_telemetry(app)  # 그 다음 OTel 설정 (핸들러 보존
 def before_request():
     # 요청 ID 생성
     g.request_id = str(uuid.uuid4())
+    # 시작 시간 기록
+    g.start_time = time.perf_counter()
     
     # 사용자 정보 설정
     if 'user_id' in session:
@@ -45,11 +48,26 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    # 요청 완료 로깅
-    log_info("Request completed",
-             request_id=g.request_id,
-             status_code=response.status_code,
-             response_size=len(response.get_data()))
+    # 처리 시간 계산
+    try:
+        duration_ms = round((time.perf_counter() - getattr(g, 'start_time', time.perf_counter())) * 1000, 2)
+    except Exception:
+        duration_ms = None
+
+    # 표준 액세스 로그 (Loki에서 집계용)
+    log_info(
+        "HTTP request processed",
+        event="http_access",
+        request_id=g.request_id,
+        method=request.method,
+        path=request.path,
+        status=response.status_code,
+        duration_ms=duration_ms,
+        user=getattr(g, 'user_id', None),
+        remote_addr=request.remote_addr,
+        user_agent=request.headers.get('User-Agent', ''),
+        response_size=len(response.get_data()),
+    )
     return response
 
 @app.errorhandler(Exception)
@@ -60,6 +78,100 @@ def handle_exception(e):
               exception=str(e),
               exception_type=type(e).__name__)
     return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+# -------------------------------------------------------------
+# Monitoring BFF endpoint (/api/tbd_5)
+# -------------------------------------------------------------
+def _loki_base():
+    return os.getenv('LOKI_BASE_URL', 'http://loki.20.249.154.255.nip.io')
+
+def _tempo_base():
+    return os.getenv('TEMPO_BASE_URL', 'http://tempo.20.249.154.255.nip.io')
+
+def _now_epoch_ns():
+    return int(time.time()) * 1_000_000_000
+
+def _ago_epoch_ns(seconds: int):
+    return (int(time.time()) - seconds) * 1_000_000_000
+
+def _loki_instant(query: str):
+    try:
+        r = requests.get(
+            f"{_loki_base()}/loki/api/v1/query",
+            params={"query": query},
+            timeout=8,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        log_warning("Loki instant query failed", query=query, error=str(e))
+        return {"error": str(e)}
+
+def _loki_range(query: str, start_ns: int, end_ns: int, step_s: int = 60, limit: int = None, direction: str = None):
+    params = {
+        "query": query,
+        "start": start_ns,
+        "end": end_ns,
+        "step": step_s,
+    }
+    if limit is not None:
+        params["limit"] = limit
+    if direction:
+        params["direction"] = direction
+    try:
+        r = requests.get(
+            f"{_loki_base()}/loki/api/v1/query_range",
+            params=params,
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        log_warning("Loki range query failed", query=query, error=str(e))
+        return {"error": str(e)}
+
+@app.route('/api/tbd_5', methods=['GET'])
+@login_required
+def tbd_5_dashboard():
+    """집계형 모니터링 응답 (RPS, 오류수, p95, 최근 오류 등)"""
+    service = os.getenv('OTEL_SERVICE_NAME', 'jiwoo-backend')
+    namespace = os.getenv('OTEL_SERVICE_NAMESPACE', 'jiwoo')
+
+    # 공통 selector
+    selector = f'{{service_name="{service}", service_namespace="{namespace}"}}'
+
+    now = _now_epoch_ns()
+    # 30분/15분 윈도우
+    start_30m = _ago_epoch_ns(30 * 60)
+    start_15m = _ago_epoch_ns(15 * 60)
+
+    # 쿼리 정의
+    q_rps_30m = f'sum(count_over_time({selector} |= "http_access" [1m]))'
+    q_errors_30m = f'sum(count_over_time({selector} |= "http_access" | json | status >= 400 [1m]))'
+    q_recent_errors = f'{selector} |= "http_access" | json | status >= 500'
+    q_p95_15m = f'quantile_over_time(0.95, {selector} |= "http_access" | json | unwrap duration_ms [15m])'
+    q_top_paths_5m = (
+        f'topk(5, sum by (path) (count_over_time('
+        f'{selector} |= "http_access" | json | path!="" [5m])))'
+    )
+
+    # 실행
+    rps_30m = _loki_range(q_rps_30m, start_30m, now, step_s=60)
+    errors_30m = _loki_range(q_errors_30m, start_30m, now, step_s=60)
+    recent_errors = _loki_range(q_recent_errors, _ago_epoch_ns(6 * 60 * 60), now, limit=10, direction='BACKWARD')
+    p95_15m = _loki_instant(q_p95_15m)
+    top_paths_5m = _loki_instant(q_top_paths_5m)
+
+    return jsonify({
+        "success": True,
+        "service": service,
+        "namespace": namespace,
+        "rps_30m": rps_30m,
+        "errors_30m": errors_30m,
+        "recent_errors": recent_errors,
+        "p95_ms_15m": p95_15m,
+        "top_paths_5m": top_paths_5m,
+    })
 
 # # 스레드 풀 생성
 # thread_pool = ThreadPoolExecutor(max_workers=5)
@@ -201,11 +313,22 @@ def save_to_db():
 def get_from_db():
     try:
         user_id = session['user_id']
+        # 페이지네이션 파라미터 처리 (기본값: offset=0, limit=20, 최대 100)
+        try:
+            offset = int(request.args.get('offset', 0))
+            limit = int(request.args.get('limit', 20))
+        except ValueError:
+            offset, limit = 0, 20
+        offset = max(offset, 0)
+        limit = max(1, min(limit, 100))
         
         db = get_db_connection()
         cursor = db.cursor()
-        
-        cursor.execute("SELECT * FROM messages WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
+        # LIMIT/OFFSET 안전 적용
+        cursor.execute(
+            "SELECT * FROM messages WHERE user_id = %s ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            (user_id, limit, offset),
+        )
         messages = cursor.fetchall()
         
         cursor.close()
