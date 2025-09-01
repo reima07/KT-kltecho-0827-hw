@@ -17,22 +17,20 @@ psycopg2-binary==2.9.9
 requests==2.31.0
 httpx==0.25.2
 
-# OpenTelemetry Core
+# --- OpenTelemetry: SDK 1.21.0 + semconv 0.42b0 + instrumentation 0.42b0 ---
 opentelemetry-api==1.21.0
 opentelemetry-sdk==1.21.0
-
-# OpenTelemetry Exporters
+opentelemetry-semantic-conventions==0.42b0
 opentelemetry-exporter-otlp-proto-http==1.21.0
+opentelemetry-exporter-otlp-proto-common==1.21.0
+opentelemetry-proto==1.21.0
 
-# OpenTelemetry Instrumentation
-opentelemetry-instrumentation==0.44b0
-opentelemetry-instrumentation-fastapi==0.44b0
-opentelemetry-instrumentation-requests==0.44b0
-opentelemetry-instrumentation-sqlalchemy==0.44b0
-opentelemetry-instrumentation-logging==0.44b0
-
-# OpenTelemetry Semantic Conventions (버전 맞춤)
-opentelemetry-semantic-conventions==0.44b0
+opentelemetry-instrumentation==0.42b0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-asgi==0.42b0
+opentelemetry-instrumentation-requests==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-logging==0.42b0
 
 # 로깅 및 유틸리티
 python-json-logger==2.0.7
