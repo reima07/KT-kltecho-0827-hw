@@ -18,6 +18,15 @@ import requests
 from telemetry import setup_telemetry
 from logging_config import setup_logging, log_info, log_error, log_warning, log_debug
 
+# 로그인 데코레이터 정의
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({"status": "error", "message": "Login required"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True)  # 세션을 위한 credentials 지원
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')  # 세션을 위한 시크릿 키
